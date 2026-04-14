@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AmpIQ Dashboard - Rock Solid Funding</title>
+<style>
+body{margin:0;background:#0b0d14;color:#e8eaf4;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Inter,sans-serif}
+.loader{text-align:center}
+.spinner{width:40px;height:40px;border:3px solid #222738;border-top:3px solid #9c6cfe;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="loader"><div class="spinner"></div><p>Loading AmpIQ Dashboard...</p></div>
+<script>
+fetch("https://fkafwizzqdwookdwjjmr.supabase.co/storage/v1/object/public/ampiq-app/index.html")
+.then(r=>r.text())
+.then(html=>{document.open();document.write(html);document.close()})
+.catch(e=>{document.querySelector(".loader p").textContent="Error loading: "+e.message});
+</script>
+</body>
+</html>
