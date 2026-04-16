@@ -3,21 +3,948 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AmpIQ Dashboard - Rock Solid Funding</title>
+<title>&#913;&#916; IQ &#8212; AI CFO Platform | Rock Solid Funding</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-body{margin:0;background:#0b0d14;color:#e8eaf4;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Inter,sans-serif}
-.loader{text-align:center}
-.spinner{width:40px;height:40px;border:3px solid #222738;border-top:3px solid #9c6cfe;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
-@keyframes spin{to{transform:rotate(360deg)}}
+:root {
+  --bg:#0b0d14; --surface:#131620; --surface2:#1a1e2e; --surface3:#222738;
+  --border:#2a2f42; --text:#e8eaf4; --text2:#8b90a8; --text3:#5c6180;
+  --accent:#7c6cf0; --accent2:#a89cff; --accent-bg:rgba(124,108,240,0.08);
+  --green:#00c9a7; --green-bg:rgba(0,201,167,0.1);
+  --red:#ff6b6b; --red-bg:rgba(255,107,107,0.1);
+  --orange:#ffa94d; --orange-bg:rgba(255,169,77,0.1);
+  --blue:#4dabf7; --blue-bg:rgba(77,171,247,0.1);
+  --radius:10px; --radius-lg:16px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+a{color:var(--accent2);text-decoration:none;}
+
+/* ── Login Overlay ── */
+#loginOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center;}
+.login-container{width:100%;max-width:420px;padding:40px;}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+.login-brand{text-align:center;margin-bottom:32px;}
+.login-brand h1{font-size:28px;font-weight:700;letter-spacing:-0.5px;margin-bottom:4px;}
+.login-brand h1 span{color:var(--accent2);}
+.login-brand .sub{font-size:12px;color:var(--text2);}
+.login-form{display:flex;flex-direction:column;gap:16px;}
+.form-group{display:flex;flex-direction:column;gap:6px;}
+.form-group label{font-size:12px;color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:0.5px;}
+.form-group input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--text);font-size:13px;transition:all 0.2s;}
+.form-group input:focus{outline:none;border-color:var(--accent);background:rgba(124,108,240,0.05);}
+.login-btn{background:var(--accent);color:#fff;border:none;padding:10px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;}
+.login-btn:hover{background:var(--accent2);transform:translateY(-1px);}
+.login-btn:active{transform:translateY(0);}
+.login-error{background:var(--red-bg);border:1px solid rgba(255,107,107,0.3);color:var(--red);padding:10px 12px;border-radius:6px;font-size:11px;margin-bottom:12px;display:none;}
+
+/* ── Sidebar ── */
+.sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;}
+.sidebar-brand{padding:20px 20px 16px;border-bottom:1px solid var(--border);}
+.sidebar-brand h1{font-size:18px;font-weight:700;letter-spacing:-0.5px;}
+.sidebar-brand h1 span{color:var(--accent2);}
+.sidebar-brand .sub{font-size:11px;color:var(--text2);margin-top:2px;}
+.sidebar-nav{flex:1;padding:12px 8px;overflow-y:auto;}
+.nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);padding:16px 12px 6px;font-weight:600;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:var(--text2);cursor:pointer;transition:all 0.15s;margin:1px 0;}
+.nav-item:hover{background:var(--surface2);color:var(--text);}
+.nav-item.active{background:var(--accent-bg);color:var(--accent2);font-weight:500;}
+.nav-item .icon{width:18px;text-align:center;font-size:14px;}
+.nav-item .badge{margin-left:auto;font-size:10px;padding:2px 7px;border-radius:10px;background:var(--surface3);color:var(--text3);}
+.nav-item .badge.live{background:var(--green-bg);color:var(--green);}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);display:flex;justify-content:space-between;align-items:center;}
+.logout-btn{background:transparent;border:1px solid var(--border);color:var(--text3);padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer;transition:all 0.2s;}
+.logout-btn:hover{background:var(--surface2);color:var(--text2);}
+
+/* ── Main ── */
+.main{margin-left:240px;flex:1;min-height:100vh;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:50;}
+.topbar h2{font-size:16px;font-weight:600;}
+.topbar .status{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);}
+.topbar .dot{width:7px;height:7px;border-radius:50%;background:var(--green);}
+.topbar .entity-badge{background:var(--surface2);padding:3px 10px;border-radius:12px;font-size:11px;color:var(--text2);border:1px solid var(--border);}
+
+.content{padding:24px 28px;}
+
+/* ── Controls ── */
+.controls{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;}
+.pill-group{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.pill{padding:7px 14px;font-size:12px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all 0.15s;}
+.pill.active{background:var(--accent);color:#fff;}
+.pill:hover:not(.active){background:var(--surface2);color:var(--text);}
+
+/* ── Cards ── */
+.grid{display:grid;gap:14px;margin-bottom:20px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:1fr 1fr;}
+.grid-1{grid-template-columns:1fr;}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+.card-sm .card-title{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:500;}
+.card-sm .card-value{font-size:24px;font-weight:700;letter-spacing:-0.5px;}
+.card-sm .card-sub{font-size:11px;color:var(--text2);margin-top:3px;}
+.card-sm .delta{font-size:12px;margin-top:3px;}
+.delta.up{color:var(--green);}
+.delta.down{color:var(--red);}
+
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+.chart-card h3{font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+.chart-card h3 span{font-size:11px;color:var(--text3);font-weight:400;}
+.chart-wrap{position:relative;height:260px;}
+
+/* ── Table ── */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.table-wrap .table-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+.table-wrap .table-header h3{font-size:13px;font-weight:600;}
+.table-wrap .table-header span{font-size:11px;color:var(--text3);}
+.table-scroll{max-height:380px;overflow-y:auto;}
+table{width:100%;border-collapse:collapse;font-size:11px;}
+th{text-align:left;padding:8px 14px;border-bottom:1px solid var(--border);color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;font-weight:500;font-size:10px;position:sticky;top:0;background:var(--surface);white-space:nowrap;}
+td{padding:7px 14px;border-bottom:1px solid rgba(42,47,66,0.5);white-space:nowrap;}
+tr.fc td{color:var(--accent2);opacity:0.85;}
+tr:hover td{background:rgba(124,108,240,0.03);}
+
+/* ── Module placeholders ── */
+.module-placeholder{text-align:center;padding:80px 40px;}
+.module-placeholder .icon-big{font-size:48px;margin-bottom:16px;}
+.module-placeholder h3{font-size:20px;margin-bottom:8px;}
+.module-placeholder p{color:var(--text2);font-size:14px;max-width:500px;margin:0 auto 20px;}
+.module-placeholder .tag{display:inline-block;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:500;}
+.tag-live{background:var(--green-bg);color:var(--green);}
+.tag-coming{background:var(--orange-bg);color:var(--orange);}
+.tag-beta{background:var(--blue-bg);color:var(--blue);}
+
+/* ── Cutoff Slider ── */
+.slider-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;}
+.slider-panel .slider-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.slider-panel .slider-title{font-size:12px;font-weight:600;color:var(--text);}
+.slider-panel .slider-value{font-size:12px;font-weight:600;color:var(--accent2);background:var(--accent-bg);padding:3px 10px;border-radius:6px;}
+.slider-panel .slider-desc{font-size:11px;color:var(--text2);margin-bottom:12px;}
+.slider-panel input[type=range]{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:var(--surface3);outline:none;cursor:pointer;}
+.slider-panel input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--accent2);cursor:pointer;transition:all 0.15s;}
+.slider-panel input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2);box-shadow:0 0 8px rgba(124,108,240,0.5);}
+.slider-panel input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--accent2);cursor:pointer;}
+.slider-panel .slider-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:9px;color:var(--text3);}
+.cutoff-impact{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.cutoff-impact .impact-item{text-align:center;}
+.cutoff-impact .impact-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;}
+.cutoff-impact .impact-value{font-size:14px;font-weight:700;margin-top:2px;}
+.cutoff-impact .impact-delta{font-size:10px;margin-top:1px;}
+
+.loading{display:flex;align-items:center;justify-content:center;height:200px;color:var(--text2);font-size:13px;}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin-right:10px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.error-bar{background:var(--red-bg);border:1px solid rgba(255,107,107,0.3);color:var(--red);padding:10px 18px;border-radius:8px;font-size:12px;margin-bottom:16px;}
+
+@media(max-width:1200px){.grid-4{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:900px){
+  .sidebar{width:60px;}.sidebar-brand .sub,.nav-item span:not(.icon),.nav-section,.sidebar-footer,.nav-item .badge{display:none;}
+  .sidebar-brand h1{font-size:14px;}.main{margin-left:60px;}
+  .grid-4,.grid-3{grid-template-columns:1fr 1fr;}.grid-2{grid-template-columns:1fr;}
+}
 </style>
 </head>
 <body>
-<div class="loader"><div class="spinner"></div><p>Loading AmpIQ Dashboard...</p></div>
+
+<!-- Login Overlay -->
+<div id="loginOverlay">
+  <div class="login-container">
+    <div class="login-box">
+      <div class="login-brand">
+        <h1><span>&#913;&#916;</span> IQ</h1>
+        <div class="sub">AI CFO Platform</div>
+      </div>
+      <div class="login-error" id="loginError"></div>
+      <form class="login-form" id="loginForm">
+        <div class="form-group">
+          <label for="emailInput">Email</label>
+          <input type="email" id="emailInput" placeholder="you@example.com" required>
+        </div>
+        <div class="form-group">
+          <label for="passwordInput">Password</label>
+          <input type="password" id="passwordInput" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="login-btn">Sign In</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <h1><span>&#913;&#916;</span> IQ</h1>
+    <div class="sub">AI CFO Platform · RSF</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Financial Intelligence</div>
+    <div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+      <span class="icon">📊</span><span>Dashboard</span><span class="badge live">Live</span>
+    </div>
+    <div class="nav-item" data-page="cashflow" onclick="navigate('cashflow')">
+      <span class="icon">💰</span><span>Cash Flow</span><span class="badge live">Live</span>
+    </div>
+    <div class="nav-item" data-page="pnl" onclick="navigate('pnl')">
+      <span class="icon">📈</span><span>P&L Analysis</span><span class="badge live">Live</span>
+    </div>
+    <div class="nav-section">Risk & Modeling</div>
+    <div class="nav-item" data-page="clg" onclick="navigate('clg')">
+      <span class="icon">🛡️</span><span>CLG Model</span><span class="badge live">Live</span>
+    </div>
+    <div class="nav-item" data-page="loantape" onclick="navigate('loantape')">
+      <span class="icon">🏦</span><span>Loan Tape</span><span class="badge">Q3</span>
+    </div>
+    <div class="nav-item" data-page="scenarios" onclick="navigate('scenarios')">
+      <span class="icon">🔮</span><span>Scenarios</span><span class="badge">Q3</span>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <span>v0.3.0 &#183; Amplifi Intelligence</span>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+</aside>
+
+<!-- Main Content -->
+<div class="main">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <h2 id="pageTitle">KPI Dashboard</h2>
+      <span class="entity-badge">RSF · Rock Solid Funding</span>
+    </div>
+    <div class="status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Connecting…</span>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="errorBar" class="error-bar" style="display:none;"></div>
+
+    <!-- ═══ DASHBOARD PAGE ═══ -->
+    <div id="page-dashboard" class="page">
+      <div class="controls">
+        <div class="pill-group" id="viewToggle">
+          <button class="pill active" data-v="all">All</button>
+          <button class="pill" data-v="historical">Historical</button>
+          <button class="pill" data-v="forecast">Forecast</button>
+        </div>
+        <div class="pill-group" id="chartToggle">
+          <button class="pill active" data-c="liquidity">Liquidity</button>
+          <button class="pill" data-c="ratios">Ratios</button>
+          <button class="pill" data-c="cashflow">Cash Flow</button>
+        </div>
+      </div>
+      <div class="grid grid-4" id="kpiCards"><div class="card"><div class="loading"><div class="spinner"></div>Loading KPIs…</div></div></div>
+      <div class="grid grid-1" style="margin-bottom:16px;">
+        <div class="chart-card"><h3 id="mainChartTitle">Liquidity Trajectory</h3><div class="chart-wrap"><canvas id="mainChart"></canvas></div></div>
+      </div>
+      <div class="grid grid-2">
+        <div class="chart-card"><h3>Cash Flow Bridge<span>Monthly</span></h3><div class="chart-wrap"><canvas id="cfBarChart"></canvas></div></div>
+        <div class="chart-card"><h3>Debt/Equity & ROE<span>Dual Axis</span></h3><div class="chart-wrap"><canvas id="dteChart"></canvas></div></div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px;">
+        <div class="table-header"><h3>Monthly KPI Detail</h3><span id="tableCount"></span></div>
+        <div class="table-scroll">
+          <table><thead><tr>
+            <th>Period</th><th>Cash</th><th>CR</th><th>QR</th><th>Cash R</th><th>D/E</th><th>Runway</th><th>ROE</th><th>NI</th><th>CF</th><th>Type</th>
+          </tr></thead><tbody id="kpiTBody"><tr><td colspan="11" class="loading">Loading…</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CASH FLOW PAGE ═══ -->
+    <div id="page-cashflow" class="page" style="display:none;">
+      <div class="controls">
+        <div class="pill-group" id="cfViewToggle">
+          <button class="pill active" data-v="all">All</button>
+          <button class="pill" data-v="historical">Historical</button>
+          <button class="pill" data-v="forecast">Forecast</button>
+        </div>
+      </div>
+      <div class="grid grid-4" id="cfKpiCards"></div>
+      <div class="grid grid-1">
+        <div class="chart-card"><h3>Cash Flow Waterfall<span>Indirect Method</span></h3><div class="chart-wrap"><canvas id="cfWaterfall"></canvas></div></div>
+      </div>
+      <div class="grid grid-1">
+        <div class="chart-card"><h3>Cash Position vs CF<span>Overlay</span></h3><div class="chart-wrap"><canvas id="cfOverlay"></canvas></div></div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px;">
+        <div class="table-header"><h3>Cash Flow Detail</h3><span id="cfTableCount"></span></div>
+        <div class="table-scroll">
+          <table><thead><tr>
+            <th>Period</th><th>Net Income</th><th>Amort</th><th>ΔAR</th><th>ΔAP</th><th>Distrib</th><th>LG Settle</th><th>CF Total</th><th>Cash End</th><th>Type</th>
+          </tr></thead><tbody id="cfTBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ P&L PAGE ═══ -->
+    <div id="page-pnl" class="page" style="display:none;">
+      <div class="controls">
+        <div class="pill-group" id="plViewToggle">
+          <button class="pill active" data-v="all">All</button>
+          <button class="pill" data-v="historical">Historical</button>
+          <button class="pill" data-v="forecast">Forecast</button>
+        </div>
+      </div>
+      <div class="grid grid-4" id="plKpiCards"></div>
+      <div class="grid grid-1" style="margin-bottom:16px;">
+        <div class="chart-card"><h3>Net Income & Distributions</h3><div class="chart-wrap"><canvas id="plNiChart"></canvas></div></div>
+      </div>
+      <div class="grid grid-2">
+        <div class="chart-card"><h3>NI Growth Rate<span>Month-over-Month %</span></h3><div class="chart-wrap"><canvas id="plGrowthChart"></canvas></div></div>
+        <div class="chart-card"><h3>Operating Expense Proxy<span>CF Components</span></h3><div class="chart-wrap"><canvas id="plExpenseChart"></canvas></div></div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px;">
+        <div class="table-header"><h3>P&L Monthly Detail</h3><span id="plTableCount"></span></div>
+        <div class="table-scroll">
+          <table><thead><tr>
+            <th>Period</th><th>Net Income</th><th>Distributions</th><th>LG Settlement</th><th>Amort</th><th>CF Total</th><th>NI Growth %</th><th>Type</th>
+          </tr></thead><tbody id="plTBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CLG MODEL PAGE ═══ -->
+    <div id="page-clg" class="page" style="display:none;">
+      <div class="controls">
+        <div class="pill-group" id="clgViewToggle">
+          <button class="pill active" data-v="all">All</button>
+          <button class="pill" data-v="quarterly">Quarterly</button>
+          <button class="pill" data-v="annual">Annual</button>
+        </div>
+      </div>
+      <div class="slider-panel" id="cutoffPanel">
+        <div class="slider-header">
+          <span class="slider-title">Portfolio Origination Cutoff</span>
+          <span class="slider-value" id="cutoffLabel">No Cutoff (Base Case)</span>
+        </div>
+        <div class="slider-desc">Month-granular cutoff across the active decision window (Aug 2026 – Apr 2027). Post-cutoff the portfolio decays at ~6%/qtr runoff (scheduled + prepay).</div>
+        <input type="range" id="cutoffSlider" min="0" max="9" value="9" step="1">
+        <div class="slider-labels"><span>Aug '26</span><span>Dec '26</span><span>Apr '27</span><span>No Cutoff</span></div>
+        <div class="cutoff-impact" id="cutoffImpact" style="display:none;">
+          <div class="impact-item"><div class="impact-label">10yr Settlement</div><div class="impact-value" id="impactSettlement">—</div><div class="impact-delta" id="impactSettlementDelta"></div></div>
+          <div class="impact-item"><div class="impact-label">Peak CDR</div><div class="impact-value" id="impactPeakCdr">—</div><div class="impact-delta" id="impactPeakCdrDelta"></div></div>
+          <div class="impact-item"><div class="impact-label">Final Portfolio Bal</div><div class="impact-value" id="impactFinalBal">—</div><div class="impact-delta" id="impactFinalBalDelta"></div></div>
+        </div>
+      </div>
+      <div class="slider-panel" id="freezePanel" style="margin-top:12px;">
+        <div class="slider-header">
+          <span class="slider-title">Sub-600 Origination Freeze · eff. May 1, 2026</span>
+          <div class="pill-group" id="freezeToggle" style="margin:0;">
+            <button class="pill active" data-f="off">Off</button>
+            <button class="pill" data-f="on">On</button>
+          </div>
+        </div>
+        <div class="slider-desc">Sub-600 = 3.9% of sub-700 volume but 6.0% of CO dollars (PD 1.76× the 600-699 cohort; LGD pooled at ~92.5% — the 100 bps spread is within n=70 sample noise). Model reduces PD only; recovery curve uses 600-699 emergence. Benefit ramps in over ~8 quarters as pre-May '26 vintages season through peak-loss window.</div>
+        <div class="cutoff-impact" id="freezeImpact" style="display:none;">
+          <div class="impact-item"><div class="impact-label">Avoided Net Loss (10yr)</div><div class="impact-value" id="freezeAvoidLoss">—</div><div class="impact-delta" id="freezeAvoidLossSub"></div></div>
+          <div class="impact-item"><div class="impact-label">Settlement Reduction</div><div class="impact-value" id="freezeAvoidSettle">—</div><div class="impact-delta" id="freezeAvoidSettleSub"></div></div>
+          <div class="impact-item"><div class="impact-label">Peak CDR Impact</div><div class="impact-value" id="freezeCdrImpact">—</div><div class="impact-delta" id="freezeCdrImpactSub"></div></div>
+        </div>
+      </div>
+      <div class="grid grid-4" id="clgKpiCards"></div>
+      <div class="grid grid-1" style="margin-bottom:16px;">
+        <div class="chart-card"><h3>Net Settlement by Quarter</h3><div class="chart-wrap"><canvas id="clgSettlementChart"></canvas></div></div>
+      </div>
+      <div class="grid grid-2">
+        <div class="chart-card"><h3>Annualized CDR %<span>vs 3% Hurdle</span></h3><div class="chart-wrap"><canvas id="clgCdrChart"></canvas></div></div>
+        <div class="chart-card"><h3>Annual Settlement Summary</h3><div class="chart-wrap"><canvas id="clgAnnualChart"></canvas></div></div>
+      </div>
+      <div class="grid grid-1" style="margin-bottom:16px;">
+        <div class="chart-card"><h3>Portfolio Wind-Down</h3><div class="chart-wrap"><canvas id="clgPortfolioChart"></canvas></div></div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px;">
+        <div class="table-header"><h3>CLG Quarterly Detail</h3><span id="clgTableCount"></span></div>
+        <div class="table-scroll">
+          <table><thead><tr>
+            <th>Quarter</th><th>Portfolio Bal</th><th>≤699 Bal</th><th>Gross CO</th><th>Recoveries</th><th>Net Loss</th><th>Hurdle</th><th>Excess</th><th>Settlement</th><th>Direction</th><th>CDR %</th>
+          </tr></thead><tbody id="clgTBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LOAN TAPE PAGE ═══ -->
+    <div id="page-loantape" class="page" style="display:none;">
+      <div class="module-placeholder">
+        <div class="icon-big">🏦</div>
+        <h3>Loan Tape Analytics</h3>
+        <p>Portfolio-level metrics, vintage analysis, delinquency tracking, concentration risk heatmaps, and automated tape reconciliation against your Supabase loan records.</p>
+        <span class="tag tag-coming">Roadmap · Q3 2026</span>
+      </div>
+    </div>
+
+    <!-- ═══ SCENARIOS PAGE ═══ -->
+    <div id="page-scenarios" class="page" style="display:none;">
+      <div class="module-placeholder">
+        <div class="icon-big">🔮</div>
+        <h3>Scenario & Stress Testing</h3>
+        <p>Toggle growth rates, loss assumptions, and funding costs in real time. Run base, bull, and bear cases with instant P&L / BS / CF impact visualization.</p>
+        <span class="tag tag-coming">Roadmap · Q3 2026</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <script>
-fetch("https://fkafwizzqdwookdwjjmr.supabase.co/storage/v1/object/public/ampiq-app/index.html")
-.then(r=>r.text())
-.then(html=>{document.open();document.write(html);document.close()})
-.catch(e=>{document.querySelector(".loader p").textContent="Error loading: "+e.message});
+// ─── CONFIG ──────────────────────────────────────────────────────
+const S_URL = 'https://fkafwizzqdwookdwjjmr.supabase.co';
+const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrYWZ3aXp6cWR3b29rZHdqam1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MzUxNzAsImV4cCI6MjA5MTQxMTE3MH0.S_m7m3mDmPXHheH95YemrYhg_nxtXLFA1AhvRFCebkE';
+const HDRS = { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}`, 'Content-Type': 'application/json' };
+
+async function q(table, sel='*', extra='') {
+  let orderClause='order=period.asc';
+  if(table==='clg_quarterly')orderClause='order=id.asc';
+  if(table==='clg_annual')orderClause='order=id.asc';
+  const r = await fetch(`${S_URL}/rest/v1/${table}?select=${encodeURIComponent(sel)}${extra}&${orderClause}`, {headers:HDRS});
+  if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).substring(0,200)}`);
+  return r.json();
+}
+
+// ─── STATE ───────────────────────────────────────────────────────
+let kpiData=[], cfData=[], plData=[], clgQuarterly=[], clgAnnual=[];
+let viewFilter='all', chartMode='liquidity', cfViewFilter='all', plViewFilter='all', clgViewFilter='all';
+let currentPage='dashboard', cutoffMonthIdx=9, sub600Freeze=false;
+// Month-granular cutoff window: Aug'26 → Apr'27 + No Cutoff. Mapped to fractional quarterly position.
+const MONTH_LABELS=['Aug 2026','Sep 2026','Oct 2026','Nov 2026','Dec 2026','Jan 2027','Feb 2027','Mar 2027','Apr 2027','No Cutoff'];
+const MONTH_QTR_MAP=[
+  {qtr:2,frac:2/3},{qtr:2,frac:1.0},{qtr:3,frac:1/3},{qtr:3,frac:2/3},{qtr:3,frac:1.0},
+  {qtr:4,frac:1/3},{qtr:4,frac:2/3},{qtr:4,frac:1.0},{qtr:5,frac:1/3}
+];
+// Sub-600 freeze constants — framework: PD×EAD×LGD, frequency is the lever not severity
+const SUB600_CO_SHARE=0.060;       // share of sub-700 CO dollars attributable to sub-600 (PD 1.76x, EAD $8.7k vs $9.8k, volume 3.9%)
+const FREEZE_EFFECTIVE_QTR=1+1/3;  // May 1, 2026 = 1/3 into Q2 2026 (quarterly index 1)
+const charts = {};
+let accessToken = null;
+
+// ─── AUTH ────────────────────────────────────────────────────────
+async function login(e) {
+  e.preventDefault();
+  const email = document.getElementById('emailInput').value;
+  const password = document.getElementById('passwordInput').value;
+  const errorDiv = document.getElementById('loginError');
+
+  try {
+    errorDiv.style.display = 'none';
+    const res = await fetch(`${S_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': S_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error_description || err.message || 'Authentication failed');
+    }
+
+    const data = await res.json();
+    accessToken = data.access_token;
+    localStorage.setItem('ampiq_token', accessToken);
+
+    document.getElementById('loginOverlay').style.display = 'none';
+    loadAll();
+  } catch (err) {
+    errorDiv.textContent = err.message;
+    errorDiv.style.display = 'block';
+  }
+}
+
+function logout() {
+  accessToken = null;
+  localStorage.removeItem('ampiq_token');
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('loginForm').reset();
+}
+
+// ─── FORMATTERS ──────────────────────────────────────────────────
+const $=v=>v==null?'—':'$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+const R=v=>v==null?'—':Number(v).toFixed(2);
+const P=v=>v==null?'—':(Number(v)*100).toFixed(1)+'%';
+const M=d=>{const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-US',{month:'short',year:'2-digit'});};
+const Q=q=>`Q${q}`;
+function delta(cur,prv,fmt){
+  if(!prv||cur==null||prv==null)return'';
+  const d=Number(cur)-Number(prv);const cls=d>=0?'up':'down';const a=d>=0?'↑':'↓';
+  return `<div class="delta ${cls}">${a} ${fmt==='$'?$(Math.abs(d)):Math.abs(d).toFixed(2)}</div>`;
+}
+function filt(data,f){
+  if(f==='historical')return data.filter(r=>!r.is_forecast);
+  if(f==='forecast')return data.filter(r=>r.is_forecast);
+  return data;
+}
+
+// ─── CHART DEFAULTS ──────────────────────────────────────────────
+const CD = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#8b90a8',font:{size:10}}}},
+  scales:{
+    x:{ticks:{color:'#5c6180',font:{size:9},maxRotation:45},grid:{color:'rgba(42,47,66,0.4)'}},
+    y:{ticks:{color:'#5c6180',font:{size:9}},grid:{color:'rgba(42,47,66,0.4)'}}
+  }
+};
+function mk(id,type,data,opts={}){
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id).getContext('2d'),{type,data,options:{...CD,...opts}});
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────────
+function navigate(page){
+  currentPage=page;
+  document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+  document.getElementById('page-'+page).style.display='block';
+  document.querySelectorAll('.nav-item').forEach(n=>{n.classList.toggle('active',n.dataset.page===page);});
+  const titles={dashboard:'KPI Dashboard',cashflow:'Cash Flow Analysis',pnl:'P&L Analysis',clg:'Cargo Loss Guarantee',loantape:'Loan Tape Analytics',scenarios:'Scenario Testing'};
+  document.getElementById('pageTitle').textContent=titles[page]||page;
+  if(page==='dashboard')renderDashboard();
+  if(page==='cashflow')renderCashFlow();
+  if(page==='pnl')renderPnL();
+  if(page==='clg')renderCLG();
+}
+
+// ─── DATA LOAD ───────────────────────────────────────────────────
+async function loadAll(){
+  try{
+    [kpiData, cfData, plData, clgQuarterly, clgAnnual] = await Promise.all([
+      q('monthly_kpi'),
+      q('monthly_cf'),
+      q('monthly_pl'),
+      q('clg_quarterly'),
+      q('clg_annual')
+    ]);
+    document.getElementById('statusDot').style.background='var(--green)';
+    document.getElementById('statusText').textContent=`Live · ${kpiData.length + cfData.length + plData.length + clgQuarterly.length + clgAnnual.length} records`;
+    document.getElementById('errorBar').style.display='none';
+    renderDashboard();
+  }catch(e){
+    document.getElementById('statusDot').style.background='var(--red)';
+    document.getElementById('statusText').textContent='Error';
+    document.getElementById('errorBar').textContent='Data load error: '+e.message;
+    document.getElementById('errorBar').style.display='block';
+    console.error(e);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DASHBOARD PAGE
+// ═══════════════════════════════════════════════════════════════════
+function renderDashboard(){
+  const d=filt(kpiData,viewFilter);
+  if(!d.length){document.getElementById('kpiCards').innerHTML='<div class="card card-sm"><div class="card-value">No data</div></div>';return;}
+  const L=d[d.length-1], P2=d.length>1?d[d.length-2]:null;
+  const cards=[
+    {t:'Cash Position',v:$(L.cash),d:delta(L.cash,P2?.cash,'$'),s:L.is_forecast?'Forecast':'Actual'},
+    {t:'Current Ratio',v:R(L.current_ratio),d:delta(L.current_ratio,P2?.current_ratio,'r'),s:Number(L.current_ratio)>=1.5?'✓ Healthy':'⚠ Below 1.5x'},
+    {t:'Debt / Equity',v:R(L.debt_to_equity),d:delta(L.debt_to_equity,P2?.debt_to_equity,'r'),s:Number(L.debt_to_equity)<1?'✓ Low leverage':'Leveraged'},
+    {t:'ROE (Ann.)',v:P(L.roe_annualized),d:'',s:L.is_forecast?'Projected':'Trailing'},
+    {t:'Net Income',v:$(L.net_income),d:delta(L.net_income,P2?.net_income,'$'),s:M(L.period)},
+    {t:'Cash Flow',v:$(L.cf_total),d:delta(L.cf_total,P2?.cf_total,'$'),s:'Monthly total'},
+    {t:'Quick Ratio',v:R(L.quick_ratio),d:delta(L.quick_ratio,P2?.quick_ratio,'r'),s:Number(L.quick_ratio)>=1?'✓ Adequate':'⚠ Tight'},
+    {t:'Cash Ratio',v:R(L.cash_ratio),d:delta(L.cash_ratio,P2?.cash_ratio,'r'),s:'Pure liquidity'}
+  ];
+  document.getElementById('kpiCards').innerHTML=cards.map(c=>`<div class="card card-sm"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div>${c.d}<div class="card-sub">${c.s}</div></div>`).join('');
+
+  // Main chart
+  const labels=d.map(r=>M(r.period));
+  if(chartMode==='liquidity'){
+    document.getElementById('mainChartTitle').textContent='Liquidity Trajectory';
+    const hi=d.findIndex(r=>r.is_forecast);
+    const cash=d.map(r=>Number(r.cash));
+    const hc=cash.map((v,i)=>(hi<0||i<hi)?v:null);
+    const fc=cash.map((v,i)=>(hi>=0&&i>=hi-1)?v:null);
+    mk('mainChart','line',{labels,datasets:[
+      {label:'Cash (Hist)',data:hc,borderColor:'#7c6cf0',backgroundColor:'rgba(124,108,240,0.08)',fill:true,tension:.3,pointRadius:2},
+      {label:'Cash (FC)',data:fc,borderColor:'#a89cff',backgroundColor:'rgba(168,156,255,0.06)',borderDash:[5,3],fill:true,tension:.3,pointRadius:2},
+      {label:'Equity',data:d.map(r=>Number(r.total_equity)),borderColor:'#00c9a7',backgroundColor:'transparent',tension:.3,pointRadius:0,borderWidth:1.5}
+    ]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+  } else if(chartMode==='ratios'){
+    document.getElementById('mainChartTitle').textContent='Liquidity Ratios';
+    mk('mainChart','line',{labels,datasets:[
+      {label:'Current',data:d.map(r=>Number(r.current_ratio)),borderColor:'#4dabf7',tension:.3,pointRadius:2},
+      {label:'Quick',data:d.map(r=>Number(r.quick_ratio)),borderColor:'#7c6cf0',tension:.3,pointRadius:2},
+      {label:'Cash',data:d.map(r=>Number(r.cash_ratio)),borderColor:'#00c9a7',tension:.3,pointRadius:2},
+      {label:'Target 1.5x',data:d.map(()=>1.5),borderColor:'rgba(255,169,77,0.4)',borderDash:[4,4],pointRadius:0,borderWidth:1}
+    ]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(1)+'x'}}}});
+  } else {
+    document.getElementById('mainChartTitle').textContent='Monthly Cash Flow';
+    mk('mainChart','line',{labels,datasets:[
+      {label:'NI',data:d.map(r=>Number(r.net_income)),borderColor:'#7c6cf0',backgroundColor:'rgba(124,108,240,0.15)',fill:true,tension:.3,pointRadius:2},
+      {label:'CF',data:d.map(r=>Number(r.cf_total)),borderColor:'#00c9a7',tension:.3,pointRadius:2}
+    ]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+  }
+
+  // CF bar
+  const cfd=filt(cfData,viewFilter);
+  const cfV=cfd.map(r=>Number(r.cf_total));
+  mk('cfBarChart','bar',{labels:cfd.map(r=>M(r.period)),datasets:[{label:'CF',data:cfV,backgroundColor:cfV.map(v=>v>=0?'rgba(0,201,167,0.6)':'rgba(255,107,107,0.6)'),borderRadius:3}]},
+    {plugins:{legend:{display:false}},scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // DTE chart
+  mk('dteChart','line',{labels,datasets:[
+    {label:'D/E',data:d.map(r=>Number(r.debt_to_equity)),borderColor:'#ff6b6b',tension:.3,pointRadius:2,yAxisID:'y'},
+    {label:'ROE %',data:d.map(r=>r.roe_annualized!=null?Number(r.roe_annualized)*100:null),borderColor:'#00c9a7',tension:.3,pointRadius:2,yAxisID:'y1'}
+  ]},{scales:{x:CD.scales.x,y:{...CD.scales.y,position:'left',title:{display:true,text:'D/E',color:'#5c6180',font:{size:10}}},y1:{...CD.scales.y,position:'right',title:{display:true,text:'ROE %',color:'#5c6180',font:{size:10}},grid:{drawOnChartArea:false}}}});
+
+  // Table
+  document.getElementById('tableCount').textContent=`${d.length} rows`;
+  document.getElementById('kpiTBody').innerHTML=d.map(r=>`<tr class="${r.is_forecast?'fc':''}"><td>${M(r.period)}</td><td>${$(r.cash)}</td><td>${R(r.current_ratio)}</td><td>${R(r.quick_ratio)}</td><td>${R(r.cash_ratio)}</td><td>${R(r.debt_to_equity)}</td><td>${r.cash_runway_months!=null?Number(r.cash_runway_months).toFixed(1):'—'}</td><td>${P(r.roe_annualized)}</td><td>${$(r.net_income)}</td><td>${$(r.cf_total)}</td><td>${r.is_forecast?'FC':'Act'}</td></tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CASH FLOW PAGE
+// ═══════════════════════════════════════════════════════════════════
+function renderCashFlow(){
+  const d=filt(cfData,cfViewFilter);
+  if(!d.length)return;
+  const L=d[d.length-1],P2=d.length>1?d[d.length-2]:null;
+  const cards=[
+    {t:'CF Total',v:$(L.cf_total),d:delta(L.cf_total,P2?.cf_total,'$'),s:M(L.period)},
+    {t:'Net Income',v:$(L.net_income),d:delta(L.net_income,P2?.net_income,'$'),s:'Operating'},
+    {t:'Distributions',v:$(L.distributions),d:'',s:'Owner draws'},
+    {t:'Cash End',v:$(L.cash_end),d:delta(L.cash_end,P2?.cash_end,'$'),s:'Balance'}
+  ];
+  document.getElementById('cfKpiCards').innerHTML=cards.map(c=>`<div class="card card-sm"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div>${c.d}<div class="card-sub">${c.s}</div></div>`).join('');
+
+  const labels=d.map(r=>M(r.period));
+
+  // Waterfall
+  const components=['net_income','amortization','d_ar','d_ap','distributions','lg_settlement'];
+  const cNames=['NI','Amort','ΔAR','ΔAP','Distrib','LG Settle'];
+  const cColors=['rgba(124,108,240,0.7)','rgba(77,171,247,0.7)','rgba(0,201,167,0.7)','rgba(255,169,77,0.7)','rgba(255,107,107,0.7)','rgba(168,156,255,0.7)'];
+  mk('cfWaterfall','bar',{labels,datasets:components.map((c,i)=>({label:cNames[i],data:d.map(r=>Number(r[c])||0),backgroundColor:cColors[i],borderRadius:2}))},
+    {plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},scales:{...CD.scales,x:{...CD.scales.x,stacked:true},y:{...CD.scales.y,stacked:true,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Overlay
+  mk('cfOverlay','line',{labels,datasets:[
+    {label:'Cash End',data:d.map(r=>Number(r.cash_end)||0),borderColor:'#7c6cf0',backgroundColor:'rgba(124,108,240,0.08)',fill:true,tension:.3,pointRadius:2},
+    {label:'CF Total',data:d.map(r=>Number(r.cf_total)),borderColor:'#00c9a7',tension:.3,pointRadius:2}
+  ]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Table
+  document.getElementById('cfTableCount').textContent=`${d.length} rows`;
+  document.getElementById('cfTBody').innerHTML=d.map(r=>`<tr class="${r.is_forecast?'fc':''}"><td>${M(r.period)}</td><td>${$(r.net_income)}</td><td>${$(r.amortization)}</td><td>${$(r.d_ar)}</td><td>${$(r.d_ap)}</td><td>${$(r.distributions)}</td><td>${$(r.lg_settlement)}</td><td>${$(r.cf_total)}</td><td>${$(r.cash_end)}</td><td>${r.is_forecast?'FC':'Act'}</td></tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// P&L PAGE (Enhanced with KPI data)
+// ═══════════════════════════════════════════════════════════════════
+function renderPnL(){
+  const d=filt(kpiData,plViewFilter);
+  if(!d.length){document.getElementById('plKpiCards').innerHTML='<div class="card card-sm"><div class="card-value">No P&L data</div></div>';return;}
+  const L=d[d.length-1],P2=d.length>1?d[d.length-2]:null;
+
+  // 4 KPI cards
+  const sumNI=d.reduce((sum,r)=>sum+(Number(r.net_income)||0),0);
+  const niMargin=L.total_assets?Number(L.net_income)/Number(L.total_assets):0;
+  const distRatio=Number(L.net_income)!==0?Number(L.distributions)/Number(L.net_income):0;
+  const cards=[
+    {t:'Net Income',v:$(L.net_income),d:delta(L.net_income,P2?.net_income,'$'),s:M(L.period)},
+    {t:'Cumulative NI',v:$(sumNI),d:'',s:`Sum of ${d.length} periods`},
+    {t:'NI Margin Proxy',v:P(niMargin),d:'',s:'NI / Total Assets'},
+    {t:'Distribution Ratio',v:P(distRatio),d:'',s:'Distributions / NI'}
+  ];
+  document.getElementById('plKpiCards').innerHTML=cards.map(c=>`<div class="card card-sm"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div>${c.d}<div class="card-sub">${c.s}</div></div>`).join('');
+
+  const labels=d.map(r=>M(r.period));
+
+  // Chart 1: Net Income & Distributions
+  mk('plNiChart','bar',{labels,datasets:[
+    {label:'Net Income',data:d.map(r=>Number(r.net_income)||0),backgroundColor:'rgba(124,108,240,0.7)',borderRadius:2},
+    {label:'Distributions',data:d.map(r=>Number(r.distributions)||0),backgroundColor:'rgba(255,107,107,0.7)',borderRadius:2}
+  ]},{plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},scales:{...CD.scales,x:{...CD.scales.x},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Chart 2: NI Growth Rate
+  const niGrowth=[];
+  for(let i=1;i<d.length;i++){
+    const cur=Number(d[i].net_income)||0;
+    const prev=Number(d[i-1].net_income)||0;
+    const growth=prev!==0?(cur-prev)/Math.abs(prev)*100:0;
+    niGrowth.push(growth);
+  }
+  const growthLabels=d.slice(1).map(r=>M(r.period));
+  mk('plGrowthChart','line',{labels:growthLabels,datasets:[
+    {label:'MoM % Change',data:niGrowth,borderColor:'#7c6cf0',backgroundColor:'rgba(124,108,240,0.08)',fill:true,tension:.3,pointRadius:2}
+  ]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(0)+'%'}}}});
+
+  // Chart 3: Operating Expense Proxy (CF components)
+  const expenseCompnts=['amortization','d_ar','d_ap','d_cc','d_note','lg_settlement'];
+  const expenseLabels=['Amort','ΔAR','ΔAP','ΔCC','ΔNote','LG Settle'];
+  const expenseColors=['rgba(124,108,240,0.7)','rgba(77,171,247,0.7)','rgba(0,201,167,0.7)','rgba(255,169,77,0.7)','rgba(255,107,107,0.7)','rgba(168,156,255,0.7)'];
+  const cfLabels=filt(cfData,plViewFilter).map(r=>M(r.period));
+  const cfExpenseDatasets=expenseCompnts.map((c,i)=>({
+    label:expenseLabels[i],
+    data:filt(cfData,plViewFilter).map(r=>Math.abs(Number(r[c])||0)),
+    backgroundColor:expenseColors[i],
+    borderRadius:2
+  }));
+  mk('plExpenseChart','bar',{labels:cfLabels,datasets:cfExpenseDatasets},
+    {plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},scales:{...CD.scales,x:{...CD.scales.x,stacked:true},y:{...CD.scales.y,stacked:true,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Table
+  const cfTableData=filt(cfData,plViewFilter);
+  document.getElementById('plTableCount').textContent=`${d.length} rows`;
+  document.getElementById('plTBody').innerHTML=d.map((r,i)=>{
+    const niGr=i>0?niGrowth[i-1]:0;
+    const cfRow=cfTableData[i];
+    return `<tr class="${r.is_forecast?'fc':''}"><td>${M(r.period)}</td><td>${$(r.net_income)}</td><td>${$(r.distributions)}</td><td>${$(cfRow?.lg_settlement||0)}</td><td>${$(cfRow?.amortization||0)}</td><td>${$(cfRow?.cf_total||0)}</td><td>${niGr.toFixed(1)}%</td><td>${r.is_forecast?'FC':'Act'}</td></tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CLG MODEL PAGE (Dynamic Cutoff)
+// ═══════════════════════════════════════════════════════════════════
+
+// Compute scenario under two independent levers:
+//  (1) origination cutoff — month-granular fractional quarter (0-8 = Aug'26..Apr'27, 9 = No Cutoff)
+//  (2) sub-600 freeze (eff. May 1, 2026) — PD-only reduction with S-curve ramp as pre-freeze vintages season out
+function computeCutoff(monthIdx, freeze){
+  const RUNOFF_RATE=0.06;
+  const adj=clgQuarterly.map(r=>({...r}));
+  const noCutoff=monthIdx>=MONTH_QTR_MAP.length;
+  let cutoffQtrFrac=null, balAtCutoff=0, subAtCutoff=0;
+  if(!noCutoff){
+    const m=MONTH_QTR_MAP[monthIdx];
+    cutoffQtrFrac=m.qtr+m.frac;
+    // Interpolate portfolio balance at the exact cutoff point (end of cutoff month)
+    const qInt=Math.floor(cutoffQtrFrac);
+    const qFrac=cutoffQtrFrac-qInt;
+    const prevBal=qInt>0?(Number(clgQuarterly[qInt-1].portfolio_balance)||0):0;
+    const currBal=Number(clgQuarterly[qInt]?.portfolio_balance)||0;
+    balAtCutoff=prevBal*(1-qFrac)+currBal*qFrac;
+    const prevSub=qInt>0?(Number(clgQuarterly[qInt-1].sub699_balance)||0):0;
+    const currSub=Number(clgQuarterly[qInt]?.sub699_balance)||0;
+    subAtCutoff=prevSub*(1-qFrac)+currSub*qFrac;
+  }
+  for(let i=0;i<adj.length;i++){
+    const baseRow=clgQuarterly[i];
+    const basePortBal=Number(baseRow.portfolio_balance)||0;
+    const baseSubBal=Number(baseRow.sub699_balance)||0;
+    const baseCdr=Number(baseRow.ann_cdr_pct)||0;
+    const baseGrossCO=Number(baseRow.sub699_gross_co)||0;
+    const baseRecov=Number(baseRow.recoveries)||0;
+    const recovRate=baseGrossCO>0?baseRecov/baseGrossCO:0;
+    // ── Lever 1: origination cutoff ──
+    let newPortBal=basePortBal, newSubBal=baseSubBal;
+    if(!noCutoff && (i+1)>cutoffQtrFrac){
+      const qAfter=(i+1)-cutoffQtrFrac; // quarters elapsed past cutoff point
+      newPortBal=balAtCutoff*Math.pow(1-RUNOFF_RATE,qAfter);
+      newSubBal=subAtCutoff*Math.pow(1-RUNOFF_RATE,qAfter);
+    }
+    // ── Lever 2: sub-600 freeze (PD-only reduction, S-curve ramp) ──
+    let sub600Reduction=0;
+    if(freeze){
+      const qSince=Math.max(0,(i+1)-FREEZE_EFFECTIVE_QTR);
+      // Logistic ramp centered at 6 qtrs post-freeze — reflects pre-May'26 vintages seasoning through 12-24mo peak loss window
+      const ramp=1/(1+Math.exp(-0.5*(qSince-6)));
+      sub600Reduction=SUB600_CO_SHARE*ramp;
+    }
+    // Apply: charge-offs scale with balance AND with (1 - sub600Reduction)
+    const balScale=basePortBal>0?newPortBal/basePortBal:1;
+    const newGrossCO=baseGrossCO*balScale*(1-sub600Reduction);
+    const newRecov=newGrossCO*recovRate;
+    const newNetLoss=Math.max(0,newGrossCO-newRecov);
+    const newHurdle=newSubBal*0.03/4;
+    const newExcess=Math.max(0,newNetLoss-newHurdle);
+    const newCdr=baseCdr*(1-sub600Reduction); // CDR drops with PD reduction
+    adj[i].portfolio_balance=newPortBal;
+    adj[i].sub699_balance=newSubBal;
+    adj[i].sub699_gross_co=newGrossCO;
+    adj[i].recoveries=newRecov;
+    adj[i].net_loss=newNetLoss;
+    adj[i].quarterly_hurdle=newHurdle;
+    adj[i].excess_loss=newExcess;
+    adj[i].net_settlement=newExcess;
+    adj[i].direction=newExcess>0?'Merrick owes RSF':'No settlement';
+    adj[i].ann_cdr_pct=newCdr;
+  }
+  return adj;
+}
+
+// Aggregate quarterly to annual
+function aggregateAnnual(qData){
+  const byYear={};
+  qData.forEach(r=>{
+    const yr=r.quarter.substring(r.quarter.indexOf(' ')+1);
+    if(!byYear[yr])byYear[yr]={year:Number(yr),net_settlement:0};
+    byYear[yr].net_settlement+=Number(r.net_settlement)||0;
+  });
+  return Object.values(byYear).sort((a,b)=>a.year-b.year);
+}
+
+function renderCLG(){
+  // Apply both levers
+  const adjQ=computeCutoff(cutoffMonthIdx, sub600Freeze);
+  const adjA=aggregateAnnual(adjQ);
+  const baseQ=clgQuarterly;
+  const baseA=clgAnnual;
+  const cutoffActive=cutoffMonthIdx<MONTH_QTR_MAP.length;
+  const anyActive=cutoffActive||sub600Freeze;
+
+  // Update slider label
+  const sliderEl=document.getElementById('cutoffSlider');
+  const labelEl=document.getElementById('cutoffLabel');
+  const impactEl=document.getElementById('cutoffImpact');
+  const freezeImpactEl=document.getElementById('freezeImpact');
+  if(sliderEl)sliderEl.max=MONTH_LABELS.length-1;
+
+  // Cutoff label reflects combined scenario
+  const parts=[];
+  if(cutoffActive)parts.push('Stop after '+MONTH_LABELS[cutoffMonthIdx]);
+  if(sub600Freeze)parts.push('Sub-600 Freeze');
+  labelEl.textContent=parts.length?parts.join(' + '):'No Cutoff (Base Case)';
+
+  if(!anyActive){
+    impactEl.style.display='none';
+    freezeImpactEl.style.display='none';
+  } else {
+    const baseTotalSettle=baseQ.reduce((s,r)=>s+(Number(r.net_settlement)||0),0);
+    const adjTotalSettle=adjQ.reduce((s,r)=>s+(Number(r.net_settlement)||0),0);
+    const basePeakCdr=Math.max(...baseQ.map(r=>Number(r.ann_cdr_pct)||0));
+    const adjPeakCdr=Math.max(...adjQ.map(r=>Number(r.ann_cdr_pct)||0));
+    const baseFinalBal=Number(baseQ[baseQ.length-1].portfolio_balance)||0;
+    const adjFinalBal=Number(adjQ[adjQ.length-1].portfolio_balance)||0;
+
+    // Cutoff impact panel — shows combined cutoff + freeze vs base
+    impactEl.style.display='grid';
+    document.getElementById('impactSettlement').textContent=$(adjTotalSettle);
+    const sDelta=adjTotalSettle-baseTotalSettle;
+    document.getElementById('impactSettlementDelta').innerHTML=`<span class="${sDelta<=0?'delta up':'delta down'}">${sDelta<=0?'↓':'↑'} ${$(Math.abs(sDelta))} vs base</span>`;
+    document.getElementById('impactPeakCdr').textContent=P(adjPeakCdr);
+    const cDelta=(adjPeakCdr-basePeakCdr)*100;
+    document.getElementById('impactPeakCdrDelta').innerHTML=`<span class="${cDelta<=0?'delta up':'delta down'}">${cDelta<=0?'↓':'↑'} ${Math.abs(cDelta).toFixed(1)}% vs base</span>`;
+    document.getElementById('impactFinalBal').textContent=$(adjFinalBal);
+    const bDelta=adjFinalBal-baseFinalBal;
+    document.getElementById('impactFinalBalDelta').innerHTML=`<span class="${bDelta<=0?'delta up':'delta down'}">${bDelta<=0?'↓':'↑'} ${$(Math.abs(bDelta))} vs base</span>`;
+
+    // Freeze isolated impact panel — only shown when freeze is on; re-runs with cutoff but no freeze to isolate
+    if(sub600Freeze){
+      const cutoffOnly=computeCutoff(cutoffMonthIdx, false);
+      const coBaseNetLoss=cutoffOnly.reduce((s,r)=>s+(Number(r.net_loss)||0),0);
+      const coAdjNetLoss=adjQ.reduce((s,r)=>s+(Number(r.net_loss)||0),0);
+      const coBaseSettle=cutoffOnly.reduce((s,r)=>s+(Number(r.net_settlement)||0),0);
+      const coAdjSettle=adjQ.reduce((s,r)=>s+(Number(r.net_settlement)||0),0);
+      const coBasePeakCdr=Math.max(...cutoffOnly.map(r=>Number(r.ann_cdr_pct)||0));
+      const coAdjPeakCdr=Math.max(...adjQ.map(r=>Number(r.ann_cdr_pct)||0));
+      freezeImpactEl.style.display='grid';
+      document.getElementById('freezeAvoidLoss').textContent=$(coBaseNetLoss-coAdjNetLoss);
+      document.getElementById('freezeAvoidLossSub').innerHTML=`<span class="card-sub">over 10yr, PD-only</span>`;
+      document.getElementById('freezeAvoidSettle').textContent=$(coBaseSettle-coAdjSettle);
+      document.getElementById('freezeAvoidSettleSub').innerHTML=`<span class="card-sub">excess-loss that doesn't trip hurdle</span>`;
+      const cdrImp=(coAdjPeakCdr-coBasePeakCdr)*100;
+      document.getElementById('freezeCdrImpact').textContent=`${cdrImp>=0?'+':''}${cdrImp.toFixed(2)}%`;
+      document.getElementById('freezeCdrImpactSub').innerHTML=`<span class="card-sub">at peak seasoning</span>`;
+    } else {
+      freezeImpactEl.style.display='none';
+    }
+  }
+
+  let d=adjQ;
+  if(clgViewFilter==='quarterly')d=adjQ;
+  if(clgViewFilter==='annual')d=adjA;
+
+  if(!adjQ.length){document.getElementById('clgKpiCards').innerHTML='<div class="card card-sm"><div class="card-value">No CLG data</div></div>';return;}
+
+  // 4 KPI cards
+  const sumSettlement=adjA.reduce((sum,r)=>sum+(Number(r.net_settlement)||0),0);
+  const peakCDR=Math.max(...adjQ.map(r=>Number(r.ann_cdr_pct)||0));
+  const first2026=adjA.find(r=>Number(r.year)===2026);
+  const avgQtrSettlement=adjQ.length>0?adjQ.reduce((sum,r)=>sum+(Number(r.net_settlement)||0),0)/adjQ.length:0;
+
+  const cards=[
+    {t:'Total 10yr Settlement',v:$(sumSettlement),d:'',s:cutoffActive?'Cutoff Scenario':'Base Case'},
+    {t:'Peak CDR',v:P(peakCDR),d:'',s:'From quarterly'},
+    {t:'2026 Settlement',v:first2026?$(first2026.net_settlement):'—',d:'',s:'Annual'},
+    {t:'Avg Quarterly Settlement',v:$(avgQtrSettlement),d:'',s:'Mean across quarters'}
+  ];
+  document.getElementById('clgKpiCards').innerHTML=cards.map(c=>`<div class="card card-sm"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div>${c.d}<div class="card-sub">${c.s}</div></div>`).join('');
+
+  // Chart 1: Net Settlement by Quarter — scenario vs base ghost
+  const qtrLabels=adjQ.map(r=>r.quarter);
+  const datasets1=[{
+    label:'Settlement (Scenario)',
+    data:adjQ.map(r=>Number(r.net_settlement)||0),
+    backgroundColor:adjQ.map(r=>r.direction==='Merrick owes RSF'?'rgba(0,201,167,0.7)':'rgba(255,107,107,0.7)'),
+    borderRadius:2
+  }];
+  if(cutoffActive){
+    datasets1.push({
+      label:'Base Case',
+      data:baseQ.map(r=>Number(r.net_settlement)||0),
+      backgroundColor:'rgba(139,144,168,0.15)',
+      borderColor:'rgba(139,144,168,0.3)',
+      borderWidth:1,borderRadius:2
+    });
+  }
+  mk('clgSettlementChart','bar',{labels:qtrLabels,datasets:datasets1},{plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Chart 2: Annualized CDR % (with 3% hurdle line)
+  mk('clgCdrChart','line',{labels:qtrLabels,datasets:[
+    {label:'Ann. CDR %',data:adjQ.map(r=>(Number(r.ann_cdr_pct)||0)*100),borderColor:'#7c6cf0',backgroundColor:'rgba(124,108,240,0.08)',fill:true,tension:.3,pointRadius:2},
+    {label:'3% Hurdle',data:adjQ.map(()=>3),borderColor:'rgba(255,169,77,0.6)',borderDash:[4,4],pointRadius:0,borderWidth:1.5}
+  ]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(1)+'%'}}}});
+
+  // Chart 3: Portfolio Wind-Down — scenario vs base ghost
+  const portDatasets=[
+    {label:'Portfolio (Scenario)',data:adjQ.map(r=>Number(r.portfolio_balance)||0),borderColor:'#7c6cf0',tension:.3,pointRadius:2},
+    {label:'Sub-$699 (Scenario)',data:adjQ.map(r=>Number(r.sub699_balance)||0),borderColor:'#4dabf7',tension:.3,pointRadius:2}
+  ];
+  if(cutoffActive){
+    portDatasets.push(
+      {label:'Portfolio (Base)',data:baseQ.map(r=>Number(r.portfolio_balance)||0),borderColor:'rgba(124,108,240,0.25)',borderDash:[4,4],tension:.3,pointRadius:0,borderWidth:1.5},
+      {label:'Sub-$699 (Base)',data:baseQ.map(r=>Number(r.sub699_balance)||0),borderColor:'rgba(77,171,247,0.25)',borderDash:[4,4],tension:.3,pointRadius:0,borderWidth:1.5}
+    );
+  }
+  mk('clgPortfolioChart','line',{labels:qtrLabels,datasets:portDatasets},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Chart 4: Annual Settlement Summary
+  const annLabels=adjA.map(r=>r.year.toString());
+  const annSettle=adjA.map(r=>Number(r.net_settlement)||0);
+  const annDatasets=[{
+    label:'Annual Settlement (Scenario)',
+    data:annSettle,
+    backgroundColor:annSettle.map(v=>v>=0?'rgba(0,201,167,0.7)':'rgba(255,107,107,0.7)'),
+    borderRadius:2
+  }];
+  if(cutoffActive){
+    annDatasets.push({
+      label:'Base Case',
+      data:baseA.map(r=>Number(r.net_settlement)||0),
+      backgroundColor:'rgba(139,144,168,0.15)',
+      borderColor:'rgba(139,144,168,0.3)',
+      borderWidth:1,borderRadius:2
+    });
+  }
+  mk('clgAnnualChart','bar',{labels:annLabels,datasets:annDatasets},{plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Table
+  document.getElementById('clgTableCount').textContent=`${adjQ.length} quarters`;
+  document.getElementById('clgTBody').innerHTML=adjQ.map((r,i)=>{
+    const isAfterCutoff=cutoffActive&&(i+1)>(MONTH_QTR_MAP[cutoffMonthIdx].qtr+MONTH_QTR_MAP[cutoffMonthIdx].frac);
+    return `<tr class="${isAfterCutoff?'fc':''}"><td>${r.quarter}</td><td>${$(r.portfolio_balance)}</td><td>${$(r.sub699_balance)}</td><td>${$(r.sub699_gross_co)}</td><td>${$(r.recoveries)}</td><td>${$(r.net_loss)}</td><td>${$(r.quarterly_hurdle)}</td><td>${$(r.excess_loss)}</td><td>${$(r.net_settlement)}</td><td>${r.direction||'—'}</td><td>${P(r.ann_cdr_pct)}</td></tr>`;
+  }).join('');
+}
+
+// ─── EVENT LISTENERS ─────────────────────────────────────────────
+document.getElementById('loginForm').addEventListener('submit',login);
+document.getElementById('viewToggle').addEventListener('click',e=>{if(!e.target.dataset.v)return;viewFilter=e.target.dataset.v;e.target.parentNode.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');renderDashboard();});
+document.getElementById('chartToggle').addEventListener('click',e=>{if(!e.target.dataset.c)return;chartMode=e.target.dataset.c;e.target.parentNode.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');renderDashboard();});
+document.getElementById('cfViewToggle').addEventListener('click',e=>{if(!e.target.dataset.v)return;cfViewFilter=e.target.dataset.v;e.target.parentNode.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');renderCashFlow();});
+document.getElementById('plViewToggle').addEventListener('click',e=>{if(!e.target.dataset.v)return;plViewFilter=e.target.dataset.v;e.target.parentNode.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');renderPnL();});
+document.getElementById('clgViewToggle').addEventListener('click',e=>{if(!e.target.dataset.v)return;clgViewFilter=e.target.dataset.v;e.target.parentNode.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');renderCLG();});
+document.getElementById('cutoffSlider').addEventListener('input',e=>{cutoffMonthIdx=Number(e.target.value);renderCLG();});
+document.getElementById('freezeToggle').addEventListener('click',e=>{if(!e.target.dataset.f)return;sub600Freeze=e.target.dataset.f==='on';e.target.parentNode.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');renderCLG();});
+
+// ─── INIT ────────────────────────────────────────────────────────
+const token=localStorage.getItem('ampiq_token');
+if(token){
+  accessToken=token;
+  document.getElementById('loginOverlay').style.display='none';
+  loadAll();
+}else{
+  document.getElementById('loginOverlay').style.display='flex';
+}
 </script>
 </body>
 </html>
