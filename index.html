@@ -138,6 +138,21 @@ tr:hover td{background:rgba(124,108,240,0.03);}
 
 .error-bar{background:var(--red-bg);border:1px solid rgba(255,107,107,0.3);color:var(--red);padding:10px 18px;border-radius:8px;font-size:12px;margin-bottom:16px;}
 
+/* ── Upload Zone ── */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px 20px;text-align:center;transition:all 0.3s;cursor:pointer;margin-bottom:16px;}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:var(--accent-bg);}
+.upload-zone .uz-icon{font-size:32px;margin-bottom:8px;}
+.upload-zone .uz-title{font-size:13px;font-weight:600;margin-bottom:4px;}
+.upload-zone .uz-sub{font-size:11px;color:var(--text2);}
+.upload-zone input{display:none;}
+.upload-status{font-size:11px;color:var(--green);margin-top:8px;display:none;}
+.variance-pos{color:var(--green);}
+.variance-neg{color:var(--red);}
+.tab-group{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;}
+.tab-btn{padding:8px 16px;font-size:12px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all 0.15s;}
+.tab-btn.active{background:var(--accent);color:#fff;}
+.tab-btn:hover:not(.active){background:var(--surface2);color:var(--text);}
+
 @media(max-width:1200px){.grid-4{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:900px){
   .sidebar{width:60px;}.sidebar-brand .sub,.nav-item span:not(.icon),.nav-section,.sidebar-footer,.nav-item .badge{display:none;}
@@ -188,6 +203,9 @@ tr:hover td{background:rgba(124,108,240,0.03);}
     </div>
     <div class="nav-item" data-page="pnl" onclick="navigate('pnl')">
       <span class="icon">📈</span><span>P&L Analysis</span><span class="badge live">Live</span>
+    </div>
+    <div class="nav-item" data-page="origrev" onclick="navigate('origrev')">
+      <span class="icon">🏭</span><span>Originations & Revenue</span><span class="badge live">Live</span>
     </div>
     <div class="nav-section">Risk & Modeling</div>
     <div class="nav-item" data-page="clg" onclick="navigate('clg')">
@@ -386,6 +404,40 @@ tr:hover td{background:rgba(124,108,240,0.03);}
       </div>
     </div>
 
+    <!-- ═══ ORIGINATIONS & REVENUE PAGE ═══ -->
+    <div id="page-origrev" class="page" style="display:none;">
+      <div class="controls">
+        <div class="tab-group" id="orSubTab">
+          <button class="tab-btn active" data-t="originations">Originations</button>
+          <button class="tab-btn" data-t="revenue">Gross Profit</button>
+        </div>
+      </div>
+      <!-- Upload zone for actuals -->
+      <div class="upload-zone" id="actualsUploadZone">
+        <div class="uz-icon">📎</div>
+        <div class="uz-title">Drop CSV/Excel with monthly actuals here</div>
+        <div class="uz-sub">Columns: year, month, collateral, count, amount (originations) or revenue, cost, net_profit (GP)</div>
+        <input type="file" id="actualsFileInput" accept=".csv,.xlsx,.xls">
+        <div class="upload-status" id="uploadStatus"></div>
+      </div>
+      <div class="grid grid-4" id="orKpiCards"></div>
+      <div class="grid grid-1" style="margin-bottom:16px;">
+        <div class="chart-card"><h3 id="orMainChartTitle">Origination Count by Month</h3><div class="chart-wrap"><canvas id="orMainChart"></canvas></div></div>
+      </div>
+      <div class="grid grid-2">
+        <div class="chart-card"><h3 id="orChart2Title">Origination $ by Collateral</h3><div class="chart-wrap"><canvas id="orChart2"></canvas></div></div>
+        <div class="chart-card"><h3 id="orChart3Title">Forecast vs Actual</h3><div class="chart-wrap"><canvas id="orChart3"></canvas></div></div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px;">
+        <div class="table-header"><h3 id="orTableTitle">Monthly Origination Forecast</h3><span id="orTableCount"></span></div>
+        <div class="table-scroll">
+          <table><thead><tr id="orTableHead">
+            <th>Period</th><th>Collateral</th><th>Count (FC)</th><th>Count (Act)</th><th>Var %</th><th>Amount (FC)</th><th>Amount (Act)</th><th>Var %</th><th>Type</th>
+          </tr></thead><tbody id="orTBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -408,6 +460,10 @@ async function q(table, sel='*', extra='') {
 let kpiData=[], cfData=[], plData=[], clgQuarterly=[], clgAnnual=[];
 let viewFilter='all', chartMode='liquidity', cfViewFilter='all', plViewFilter='all', clgViewFilter='all';
 let currentPage='dashboard', cutoffMonthIdx=9, sub600Freeze=false;
+let orSubTab='originations';
+let orActualsOrig=[];  // uploaded actuals for originations
+let orActualsGP=[];    // uploaded actuals for gross profit
+
 // Month-granular cutoff window: Aug'26 → Apr'27 + No Cutoff. Mapped to fractional quarterly position.
 const MONTH_LABELS=['Aug 2026','Sep 2026','Oct 2026','Nov 2026','Dec 2026','Jan 2027','Feb 2027','Mar 2027','Apr 2027','No Cutoff'];
 const MONTH_QTR_MAP=[
@@ -419,6 +475,13 @@ const SUB600_CO_SHARE=0.060;       // share of sub-700 CO dollars attributable t
 const FREEZE_EFFECTIVE_QTR=1+1/3;  // May 1, 2026 = 1/3 into Q2 2026 (quarterly index 1)
 const charts = {};
 let accessToken = null;
+
+// ─── EMBEDDED FORECAST & HISTORICAL DATA ─────────────────────────
+const FORECAST_2026 = [{"year":2026,"month":1,"collateral":"Cargo/Utility","is_forecast":false,"orig_count":885,"orig_amount":10113723.1899999995,"gp_revenue":1352033.28,"gp_cost":288709.0,"gp_net_profit":1063324.28},{"year":2026,"month":1,"collateral":"Horse/Stock Trailer","is_forecast":false,"orig_count":15,"orig_amount":497934.14,"gp_revenue":40373.4,"gp_cost":7424.0,"gp_net_profit":32949.4},{"year":2026,"month":1,"collateral":"Marine","is_forecast":false,"orig_count":14,"orig_amount":346465.58,"gp_revenue":25660.23,"gp_cost":2100.0,"gp_net_profit":23560.23},{"year":2026,"month":1,"collateral":"RV/Campers","is_forecast":false,"orig_count":64,"orig_amount":2506655.7999999998,"gp_revenue":225940.91,"gp_cost":51248.0,"gp_net_profit":174692.91},{"year":2026,"month":2,"collateral":"Cargo/Utility","is_forecast":false,"orig_count":1028,"orig_amount":11458822.75,"gp_revenue":1493524.8700000001,"gp_cost":309936.0,"gp_net_profit":1183588.8700000001},{"year":2026,"month":2,"collateral":"Horse/Stock Trailer","is_forecast":false,"orig_count":16,"orig_amount":544055.01,"gp_revenue":38564.35,"gp_cost":6019.0,"gp_net_profit":32545.35},{"year":2026,"month":2,"collateral":"Marine","is_forecast":false,"orig_count":22,"orig_amount":713838.42,"gp_revenue":65663.56,"gp_cost":11052.0,"gp_net_profit":54611.56},{"year":2026,"month":2,"collateral":"RV/Campers","is_forecast":false,"orig_count":96,"orig_amount":3293831.4300000002,"gp_revenue":289090.44,"gp_cost":63813.0,"gp_net_profit":225277.44},{"year":2026,"month":3,"collateral":"Cargo/Utility","is_forecast":false,"orig_count":1328,"orig_amount":14148802.4100000001,"gp_revenue":1855423.53,"gp_cost":364851.0,"gp_net_profit":1490572.53},{"year":2026,"month":3,"collateral":"Horse/Stock Trailer","is_forecast":false,"orig_count":25,"orig_amount":815538.05,"gp_revenue":70108.85,"gp_cost":8840.0,"gp_net_profit":61268.85},{"year":2026,"month":3,"collateral":"Marine","is_forecast":false,"orig_count":30,"orig_amount":1081336.29,"gp_revenue":78185.8,"gp_cost":8805.0,"gp_net_profit":69380.8},{"year":2026,"month":3,"collateral":"RV/Campers","is_forecast":false,"orig_count":115,"orig_amount":4032561.8999999999,"gp_revenue":349003.49,"gp_cost":84919.0,"gp_net_profit":264084.49},{"year":2026,"month":4,"collateral":"Cargo/Utility","is_forecast":true,"orig_count":1621,"orig_amount":17661153.2199999988,"gp_revenue":2252558.5099999998,"gp_cost":442555.26,"gp_net_profit":1811529.3400000001},{"year":2026,"month":4,"collateral":"Horse/Stock Trailer","is_forecast":true,"orig_count":37,"orig_amount":1659504.5700000001,"gp_revenue":113678.09,"gp_cost":23420.27,"gp_net_profit":90363.29},{"year":2026,"month":4,"collateral":"Marine","is_forecast":true,"orig_count":57,"orig_amount":1910913.28,"gp_revenue":164017.72,"gp_cost":17400.12,"gp_net_profit":150536.06},{"year":2026,"month":4,"collateral":"RV/Campers","is_forecast":true,"orig_count":156,"orig_amount":5470992.0300000003,"gp_revenue":524280.32,"gp_cost":146154.34,"gp_net_profit":381129.78},{"year":2026,"month":5,"collateral":"Cargo/Utility","is_forecast":true,"orig_count":1587,"orig_amount":17230997.2600000016,"gp_revenue":2151762.29,"gp_cost":419161.94,"gp_net_profit":1734344.6899999999},{"year":2026,"month":5,"collateral":"Horse/Stock Trailer","is_forecast":true,"orig_count":34,"orig_amount":1107646.71,"gp_revenue":82541.75,"gp_cost":10052.55,"gp_net_profit":72451.65},{"year":2026,"month":5,"collateral":"Marine","is_forecast":true,"orig_count":90,"orig_amount":2644352.1400000001,"gp_revenue":232494.97,"gp_cost":25603.92,"gp_net_profit":211488.36},{"year":2026,"month":5,"collateral":"RV/Campers","is_forecast":true,"orig_count":211,"orig_amount":7736996.25,"gp_revenue":648945.92,"gp_cost":167922.91,"gp_net_profit":483168.99},{"year":2026,"month":6,"collateral":"Cargo/Utility","is_forecast":true,"orig_count":1525,"orig_amount":17738228.2600000016,"gp_revenue":2216705.0099999998,"gp_cost":452305.35,"gp_net_profit":1764561.0800000001},{"year":2026,"month":6,"collateral":"Horse/Stock Trailer","is_forecast":true,"orig_count":29,"orig_amount":1185034.1399999999,"gp_revenue":91324.69,"gp_cost":11081.29,"gp_net_profit":80201.17},{"year":2026,"month":6,"collateral":"Marine","is_forecast":true,"orig_count":87,"orig_amount":2774626.2400000002,"gp_revenue":234595.24,"gp_cost":22097.59,"gp_net_profit":220945.02},{"year":2026,"month":6,"collateral":"RV/Campers","is_forecast":true,"orig_count":237,"orig_amount":10044835.5800000001,"gp_revenue":845569.02,"gp_cost":186096.24,"gp_net_profit":658309.3100000001},{"year":2026,"month":7,"collateral":"Cargo/Utility","is_forecast":true,"orig_count":1620,"orig_amount":17939782.9100000001,"gp_revenue":2374766.5899999999,"gp_cost":500993.48,"gp_net_profit":1872634.1799999999},{"year":2026,"month":7,"collateral":"Horse/Stock Trailer","is_forecast":true,"orig_count":27,"orig_amount":891563.6,"gp_revenue":90171.65,"gp_cost":15350.87,"gp_net_profit":74851.47},{"year":2026,"month":7,"collateral":"Marine","is_forecast":true,"orig_count":120,"orig_amount":3355442.7999999998,"gp_revenue":292368.64,"gp_cost":24096.79,"gp_net_profit":282307.6},{"year":2026,"month":7,"collateral":"RV/Campers","is_forecast":true,"orig_count":217,"orig_amount":8812046.5899999999,"gp_revenue":908559.91,"gp_cost":254753.74,"gp_net_profit":659190.02},{"year":2026,"month":8,"collateral":"Cargo/Utility","is_forecast":true,"orig_count":1623,"orig_amount":19256532.3299999982,"gp_revenue":2314895.4900000002,"gp_cost":454859.54,"gp_net_profit":1861599.72},{"year":2026,"month":8,"collateral":"Horse/Stock Trailer","is_forecast":true,"orig_count":37,"orig_amount":1294056.9299999999,"gp_revenue":124694.43,"gp_cost":18759.7,"gp_net_profit":105936.66},{"year":2026,"month":8,"collateral":"Marine","is_forecast":true,"orig_count":70,"orig_amount":1798139.1799999999,"gp_revenue":165489.55,"gp_cost":15205.51,"gp_net_profit":156633.0},{"year":2026,"month":8,"collateral":"RV/Campers","is_forecast":true,"orig_count":179,"orig_amount":6519865.6799999997,"gp_revenue":611017.0,"gp_cost":123169.75,"gp_net_profit":485637.76},{"year":2026,"month":9,"collateral":"Cargo/Utility","is_forecast":true,"orig_count":1754,"orig_amount":21208520.5599999987,"gp_revenue":2672775.3399999999,"gp_cost":542952.37,"gp_net_profit":2130210.0499999998},{"year":2026,"month":9,"collateral":"Horse/Stock Trailer","is_forecast":true,"orig_count":46,"orig_amount":1641886.98,"gp_revenue":150055.61,"gp_cost":24132.36,"gp_net_profit":125951.13},{"year":2026,"month":9,"collateral":"Marine","is_forecast":true,"orig_count":22,"orig_amount":415754.22,"gp_revenue":45142.37,"gp_cost":3168.41,"gp_net_profit":44703.78},{"year":2026,"month":9,"collateral":"RV/Campers","is_forecast":true,"orig_count":142,"orig_amount":5248102.8700000001,"gp_revenue":518382.27,"gp_cost":124432.14,"gp_net_profit":394489.27},{"year":2026,"month":10,"collateral":"Cargo/Utility","is_forecast":true,"orig_count":2081,"orig_amount":25141350.8500000015,"gp_revenue":3087117.2400000002,"gp_cost":608267.6800000001,"gp_net_profit":2480801.5099999998},{"year":2026,"month":10,"collateral":"Horse/Stock Trailer","is_forecast":true,"orig_count":39,"orig_amount":1432392.0800000001,"gp_revenue":113397.04,"gp_cost":18338.99,"gp_net_profit":95080.8},{"year":2026,"month":10,"collateral":"Marine","is_forecast":true,"orig_count":18,"orig_amount":309046.47,"gp_revenue":34373.67,"gp_cost":3226.45,"gp_net_profit":32396.53},{"year":2026,"month":10,"collateral":"RV/Campers","is_forecast":true,"orig_count":151,"orig_amount":6365841.1600000001,"gp_revenue":502950.85,"gp_cost":120554.79,"gp_net_profit":382898.18},{"year":2026,"month":11,"collateral":"Cargo/Utility","is_forecast":true,"orig_count":1584,"orig_amount":19023944.4100000001,"gp_revenue":2350245.3100000001,"gp_cost":462992.34,"gp_net_profit":1888745.8999999999},{"year":2026,"month":11,"collateral":"Horse/Stock Trailer","is_forecast":true,"orig_count":36,"orig_amount":1058158.72,"gp_revenue":114473.01,"gp_cost":23106.59,"gp_net_profit":91464.79},{"year":2026,"month":11,"collateral":"Marine","is_forecast":true,"orig_count":18,"orig_amount":424826.32,"gp_revenue":42087.46,"gp_cost":6140.76,"gp_net_profit":35244.56},{"year":2026,"month":11,"collateral":"RV/Campers","is_forecast":true,"orig_count":83,"orig_amount":2742124.1099999999,"gp_revenue":285753.64,"gp_cost":84164.34,"gp_net_profit":203771.84},{"year":2026,"month":12,"collateral":"Cargo/Utility","is_forecast":true,"orig_count":1455,"orig_amount":17043899.8900000006,"gp_revenue":2024893.3899999999,"gp_cost":393272.22,"gp_net_profit":1633356.5},{"year":2026,"month":12,"collateral":"Horse/Stock Trailer","is_forecast":true,"orig_count":24,"orig_amount":1105746.27,"gp_revenue":89603.04,"gp_cost":18437.1,"gp_net_profit":71248.69},{"year":2026,"month":12,"collateral":"Marine","is_forecast":true,"orig_count":20,"orig_amount":589443.96,"gp_revenue":65949.67,"gp_cost":8685.55,"gp_net_profit":57118.49},{"year":2026,"month":12,"collateral":"RV/Campers","is_forecast":true,"orig_count":102,"orig_amount":4664695.5499999998,"gp_revenue":347879.88,"gp_cost":87759.59,"gp_net_profit":260997.23}];
+
+const HIST_ORIG = [{"year":2024,"month":1,"collateral":"Cargo/Utility","count":361,"amount":3355305.0699999998},{"year":2024,"month":1,"collateral":"Horse/Stock Trailer","count":8,"amount":198296.12},{"year":2024,"month":1,"collateral":"Marine","count":10,"amount":304359.15},{"year":2024,"month":1,"collateral":"RV/Campers","count":87,"amount":3627560.96},{"year":2024,"month":2,"collateral":"Cargo/Utility","count":493,"amount":4851931.54},{"year":2024,"month":2,"collateral":"Horse/Stock Trailer","count":13,"amount":416450.62},{"year":2024,"month":2,"collateral":"Marine","count":8,"amount":595870.46},{"year":2024,"month":2,"collateral":"RV/Campers","count":81,"amount":3528954.2599999998},{"year":2024,"month":3,"collateral":"Cargo/Utility","count":611,"amount":6252976.4699999997},{"year":2024,"month":3,"collateral":"Horse/Stock Trailer","count":13,"amount":280387.53},{"year":2024,"month":3,"collateral":"Marine","count":26,"amount":1178315.97},{"year":2024,"month":3,"collateral":"RV/Campers","count":152,"amount":6839008.2400000002},{"year":2024,"month":4,"collateral":"Cargo/Utility","count":664,"amount":6246636.3600000003},{"year":2024,"month":4,"collateral":"Horse/Stock Trailer","count":25,"amount":623084.4399999999},{"year":2024,"month":4,"collateral":"Marine","count":54,"amount":1908509.6799999999},{"year":2024,"month":4,"collateral":"RV/Campers","count":147,"amount":5385610.6399999997},{"year":2024,"month":5,"collateral":"Cargo/Utility","count":623,"amount":5923087.7000000002},{"year":2024,"month":5,"collateral":"Horse/Stock Trailer","count":18,"amount":564896.17},{"year":2024,"month":5,"collateral":"Marine","count":52,"amount":1658881.3},{"year":2024,"month":5,"collateral":"RV/Campers","count":154,"amount":6156061.9800000004},{"year":2024,"month":6,"collateral":"Cargo/Utility","count":530,"amount":5198737.79},{"year":2024,"month":6,"collateral":"Horse/Stock Trailer","count":10,"amount":248370.75},{"year":2024,"month":6,"collateral":"Marine","count":67,"amount":2404381.5099999998},{"year":2024,"month":6,"collateral":"RV/Campers","count":146,"amount":5765723.9800000004},{"year":2024,"month":7,"collateral":"Cargo/Utility","count":510,"amount":4902542.5700000003},{"year":2024,"month":7,"collateral":"Horse/Stock Trailer","count":14,"amount":373167.24},{"year":2024,"month":7,"collateral":"Marine","count":54,"amount":1756794.3},{"year":2024,"month":7,"collateral":"RV/Campers","count":137,"amount":5398579.1299999999},{"year":2024,"month":8,"collateral":"Cargo/Utility","count":517,"amount":4964278.3499999996},{"year":2024,"month":8,"collateral":"Horse/Stock Trailer","count":18,"amount":537510.05},{"year":2024,"month":8,"collateral":"Marine","count":38,"amount":1481284.53},{"year":2024,"month":8,"collateral":"RV/Campers","count":115,"amount":3909202.9900000002},{"year":2024,"month":9,"collateral":"Cargo/Utility","count":517,"amount":4816733.8899999997},{"year":2024,"month":9,"collateral":"Horse/Stock Trailer","count":12,"amount":377598.86},{"year":2024,"month":9,"collateral":"Marine","count":7,"amount":330559.03},{"year":2024,"month":9,"collateral":"RV/Campers","count":99,"amount":4172251.7999999998},{"year":2024,"month":10,"collateral":"Cargo/Utility","count":518,"amount":5271448.1799999997},{"year":2024,"month":10,"collateral":"Horse/Stock Trailer","count":17,"amount":385591.28},{"year":2024,"month":10,"collateral":"Marine","count":10,"amount":341379.59},{"year":2024,"month":10,"collateral":"RV/Campers","count":83,"amount":3230310.3799999999},{"year":2024,"month":11,"collateral":"Cargo/Utility","count":430,"amount":4319960.6399999997},{"year":2024,"month":11,"collateral":"Horse/Stock Trailer","count":11,"amount":327023.74},{"year":2024,"month":11,"collateral":"Marine","count":5,"amount":191409.35},{"year":2024,"month":11,"collateral":"RV/Campers","count":69,"amount":2843281.6200000001},{"year":2024,"month":12,"collateral":"Cargo/Utility","count":415,"amount":3991847.3700000001},{"year":2024,"month":12,"collateral":"Horse/Stock Trailer","count":6,"amount":246375.82},{"year":2024,"month":12,"collateral":"Marine","count":8,"amount":246753.33},{"year":2024,"month":12,"collateral":"RV/Campers","count":60,"amount":3100372.5600000001},{"year":2025,"month":1,"collateral":"Cargo/Utility","count":429,"amount":4284338.8600000003},{"year":2025,"month":1,"collateral":"Horse/Stock Trailer","count":13,"amount":529499.24},{"year":2025,"month":1,"collateral":"Marine","count":3,"amount":192665.24},{"year":2025,"month":1,"collateral":"RV/Campers","count":61,"amount":2303323.2400000002},{"year":2025,"month":2,"collateral":"Cargo/Utility","count":535,"amount":5271794.0199999996},{"year":2025,"month":2,"collateral":"Horse/Stock Trailer","count":10,"amount":287256.69},{"year":2025,"month":2,"collateral":"Marine","count":12,"amount":619975.95},{"year":2025,"month":2,"collateral":"RV/Campers","count":64,"amount":2844848.0299999998},{"year":2025,"month":3,"collateral":"Cargo/Utility","count":749,"amount":7802092.5199999996},{"year":2025,"month":3,"collateral":"Horse/Stock Trailer","count":16,"amount":344485.5},{"year":2025,"month":3,"collateral":"Marine","count":29,"amount":1186601.72},{"year":2025,"month":3,"collateral":"RV/Campers","count":90,"amount":3327470.0600000001},{"year":2025,"month":4,"collateral":"Cargo/Utility","count":857,"amount":8582158.6400000006},{"year":2025,"month":4,"collateral":"Horse/Stock Trailer","count":26,"amount":1037446.7},{"year":2025,"month":4,"collateral":"Marine","count":38,"amount":1783856.9099999999},{"year":2025,"month":4,"collateral":"RV/Campers","count":122,"amount":4715746.4100000001},{"year":2025,"month":5,"collateral":"Cargo/Utility","count":839,"amount":8373131.1399999997},{"year":2025,"month":5,"collateral":"Horse/Stock Trailer","count":24,"amount":692450.29},{"year":2025,"month":5,"collateral":"Marine","count":60,"amount":2468529.52},{"year":2025,"month":5,"collateral":"RV/Campers","count":165,"amount":6668939.04},{"year":2025,"month":6,"collateral":"Cargo/Utility","count":806,"amount":8619612.0399999991},{"year":2025,"month":6,"collateral":"Horse/Stock Trailer","count":20,"amount":740829.39},{"year":2025,"month":6,"collateral":"Marine","count":58,"amount":2590141.71},{"year":2025,"month":6,"collateral":"RV/Campers","count":185,"amount":8658191.6199999992},{"year":2025,"month":7,"collateral":"Cargo/Utility","count":856,"amount":8717554.3399999999},{"year":2025,"month":7,"collateral":"Horse/Stock Trailer","count":19,"amount":557364.97},{"year":2025,"month":7,"collateral":"Marine","count":80,"amount":3132339.8500000001},{"year":2025,"month":7,"collateral":"RV/Campers","count":170,"amount":7595583.5599999996},{"year":2025,"month":8,"collateral":"Cargo/Utility","count":858,"amount":9357407.9399999995},{"year":2025,"month":8,"collateral":"Horse/Stock Trailer","count":26,"amount":808985.47},{"year":2025,"month":8,"collateral":"Marine","count":47,"amount":1678581.1399999999},{"year":2025,"month":8,"collateral":"RV/Campers","count":140,"amount":5619827.8200000003},{"year":2025,"month":9,"collateral":"Cargo/Utility","count":927,"amount":10305945.8100000005},{"year":2025,"month":9,"collateral":"Horse/Stock Trailer","count":32,"amount":1026432.98},{"year":2025,"month":9,"collateral":"Marine","count":15,"amount":388110.78},{"year":2025,"month":9,"collateral":"RV/Campers","count":111,"amount":4523626.0899999999},{"year":2025,"month":10,"collateral":"Cargo/Utility","count":1100,"amount":12217042.6099999994},{"year":2025,"month":10,"collateral":"Horse/Stock Trailer","count":27,"amount":895466.3100000001},{"year":2025,"month":10,"collateral":"Marine","count":12,"amount":288498.01},{"year":2025,"month":10,"collateral":"RV/Campers","count":118,"amount":5487065.6799999997},{"year":2025,"month":11,"collateral":"Cargo/Utility","count":837,"amount":9244385.5099999998},{"year":2025,"month":11,"collateral":"Horse/Stock Trailer","count":25,"amount":661512.65},{"year":2025,"month":11,"collateral":"Marine","count":12,"amount":396579.67},{"year":2025,"month":11,"collateral":"RV/Campers","count":65,"amount":2363586.3199999998},{"year":2025,"month":12,"collateral":"Cargo/Utility","count":769,"amount":8282214.1299999999},{"year":2025,"month":12,"collateral":"Horse/Stock Trailer","count":17,"amount":691262.22},{"year":2025,"month":12,"collateral":"Marine","count":13,"amount":550251.91},{"year":2025,"month":12,"collateral":"RV/Campers","count":80,"amount":4020755.5},{"year":2026,"month":1,"collateral":"Cargo/Utility","count":885,"amount":10113723.1899999995},{"year":2026,"month":1,"collateral":"Horse/Stock Trailer","count":15,"amount":497934.14},{"year":2026,"month":1,"collateral":"Marine","count":14,"amount":346465.58},{"year":2026,"month":1,"collateral":"RV/Campers","count":64,"amount":2506655.7999999998},{"year":2026,"month":2,"collateral":"Cargo/Utility","count":1028,"amount":11458822.75},{"year":2026,"month":2,"collateral":"Horse/Stock Trailer","count":16,"amount":544055.01},{"year":2026,"month":2,"collateral":"Marine","count":22,"amount":713838.42},{"year":2026,"month":2,"collateral":"RV/Campers","count":96,"amount":3293831.4300000002},{"year":2026,"month":3,"collateral":"Cargo/Utility","count":1328,"amount":14148802.4100000001},{"year":2026,"month":3,"collateral":"Horse/Stock Trailer","count":25,"amount":815538.05},{"year":2026,"month":3,"collateral":"Marine","count":30,"amount":1081336.29},{"year":2026,"month":3,"collateral":"RV/Campers","count":115,"amount":4032561.8999999999}];
+
+const HIST_GP = [{"year":2024,"month":1,"collateral":"Cargo/Utility","revenue":501702.7,"cost":108834.0,"net_profit":392868.7},{"year":2024,"month":1,"collateral":"Horse/Stock Trailer","revenue":21719.64,"cost":4917.0,"net_profit":16802.64},{"year":2024,"month":1,"collateral":"Marine","revenue":18840.91,"cost":1375.0,"net_profit":17465.91},{"year":2024,"month":1,"collateral":"RV/Campers","revenue":276404.18,"cost":54867.0,"net_profit":221537.18},{"year":2024,"month":2,"collateral":"Cargo/Utility","revenue":712323.76,"cost":155298.0,"net_profit":557025.76},{"year":2024,"month":2,"collateral":"Horse/Stock Trailer","revenue":33254.93,"cost":4441.0,"net_profit":28813.93},{"year":2024,"month":2,"collateral":"Marine","revenue":23121.25,"cost":1887.0,"net_profit":21234.25},{"year":2024,"month":2,"collateral":"RV/Campers","revenue":262017.5,"cost":56622.0,"net_profit":205395.5},{"year":2024,"month":3,"collateral":"Cargo/Utility","revenue":887556.76,"cost":192810.0,"net_profit":694746.76},{"year":2024,"month":3,"collateral":"Horse/Stock Trailer","revenue":28549.11,"cost":3456.0,"net_profit":25093.11},{"year":2024,"month":3,"collateral":"Marine","revenue":65507.04,"cost":5830.0,"net_profit":59677.04},{"year":2024,"month":3,"collateral":"RV/Campers","revenue":576296.77,"cost":126143.0,"net_profit":450153.77},{"year":2024,"month":4,"collateral":"Cargo/Utility","revenue":972967.39,"cost":222127.0,"net_profit":750840.39},{"year":2024,"month":4,"collateral":"Horse/Stock Trailer","revenue":76540.68,"cost":14926.0,"net_profit":61614.68},{"year":2024,"month":4,"collateral":"Marine","revenue":138438.14,"cost":25075.0,"net_profit":113363.14},{"year":2024,"month":4,"collateral":"RV/Campers","revenue":462351.52,"cost":94830.0,"net_profit":367521.52},{"year":2024,"month":5,"collateral":"Cargo/Utility","revenue":900759.02,"cost":196372.0,"net_profit":704387.02},{"year":2024,"month":5,"collateral":"Horse/Stock Trailer","revenue":56294.63,"cost":11771.0,"net_profit":44523.63},{"year":2024,"month":5,"collateral":"Marine","revenue":132185.32,"cost":20222.0,"net_profit":111963.32},{"year":2024,"month":5,"collateral":"RV/Campers","revenue":533648.45,"cost":103495.0,"net_profit":430153.45},{"year":2024,"month":6,"collateral":"Cargo/Utility","revenue":783767.71,"cost":173466.0,"net_profit":610301.71},{"year":2024,"month":6,"collateral":"Horse/Stock Trailer","revenue":24322.87,"cost":2916.0,"net_profit":21406.87},{"year":2024,"month":6,"collateral":"Marine","revenue":222397.13,"cost":45417.0,"net_profit":176980.13},{"year":2024,"month":6,"collateral":"RV/Campers","revenue":448760.19,"cost":79141.0,"net_profit":369619.19},{"year":2024,"month":7,"collateral":"Cargo/Utility","revenue":778836.58,"cost":182432.0,"net_profit":596404.58},{"year":2024,"month":7,"collateral":"Horse/Stock Trailer","revenue":38648.5,"cost":6244.0,"net_profit":32404.5},{"year":2024,"month":7,"collateral":"Marine","revenue":142583.73,"cost":17150.0,"net_profit":125433.73},{"year":2024,"month":7,"collateral":"RV/Campers","revenue":465445.95,"cost":95878.0,"net_profit":369567.95},{"year":2024,"month":8,"collateral":"Cargo/Utility","revenue":814755.1,"cost":188814.0,"net_profit":625941.1},{"year":2024,"month":8,"collateral":"Horse/Stock Trailer","revenue":43251.03,"cost":4736.0,"net_profit":38515.03},{"year":2024,"month":8,"collateral":"Marine","revenue":102443.13,"cost":12757.0,"net_profit":89686.13},{"year":2024,"month":8,"collateral":"RV/Campers","revenue":425289.49,"cost":94492.0,"net_profit":330797.49},{"year":2024,"month":9,"collateral":"Cargo/Utility","revenue":720447.42,"cost":152170.0,"net_profit":568277.42},{"year":2024,"month":9,"collateral":"Horse/Stock Trailer","revenue":32176.42,"cost":4096.0,"net_profit":28080.42},{"year":2024,"month":9,"collateral":"Marine","revenue":23049.39,"cost":1787.0,"net_profit":21262.39},{"year":2024,"month":9,"collateral":"RV/Campers","revenue":354278.45,"cost":58356.0,"net_profit":295922.45},{"year":2024,"month":10,"collateral":"Cargo/Utility","revenue":781386.2,"cost":165262.0,"net_profit":616124.2},{"year":2024,"month":10,"collateral":"Horse/Stock Trailer","revenue":45447.12,"cost":7723.0,"net_profit":37724.12},{"year":2024,"month":10,"collateral":"Marine","revenue":21895.3,"cost":1075.0,"net_profit":20820.3},{"year":2024,"month":10,"collateral":"RV/Campers","revenue":334752.55,"cost":69788.0,"net_profit":264964.55},{"year":2024,"month":11,"collateral":"Cargo/Utility","revenue":635361.5699999999,"cost":137056.0,"net_profit":498305.57},{"year":2024,"month":11,"collateral":"Horse/Stock Trailer","revenue":33291.21,"cost":5371.0,"net_profit":27920.21},{"year":2024,"month":11,"collateral":"Marine","revenue":10460.3,"cost":3051.0,"net_profit":7409.3},{"year":2024,"month":11,"collateral":"RV/Campers","revenue":279074.41,"cost":48536.0,"net_profit":230538.41},{"year":2024,"month":12,"collateral":"Cargo/Utility","revenue":611935.62,"cost":140634.0,"net_profit":471301.62},{"year":2024,"month":12,"collateral":"Horse/Stock Trailer","revenue":18356.67,"cost":1742.0,"net_profit":16614.67},{"year":2024,"month":12,"collateral":"Marine","revenue":21014.23,"cost":1646.0,"net_profit":19368.23},{"year":2024,"month":12,"collateral":"RV/Campers","revenue":228939.72,"cost":36374.0,"net_profit":192565.72},{"year":2025,"month":1,"collateral":"Cargo/Utility","revenue":623642.61,"cost":137178.0,"net_profit":486464.61},{"year":2025,"month":1,"collateral":"Horse/Stock Trailer","revenue":40561.46,"cost":6414.0,"net_profit":34147.46},{"year":2025,"month":1,"collateral":"Marine","revenue":14355.34,"cost":4741.0,"net_profit":9614.34},{"year":2025,"month":1,"collateral":"RV/Campers","revenue":188113.6,"cost":35547.0,"net_profit":152566.6},{"year":2025,"month":2,"collateral":"Cargo/Utility","revenue":748225.77,"cost":158908.0,"net_profit":589317.77},{"year":2025,"month":2,"collateral":"Horse/Stock Trailer","revenue":28322.4,"cost":4647.0,"net_profit":23675.4},{"year":2025,"month":2,"collateral":"Marine","revenue":54039.34,"cost":18265.0,"net_profit":35774.34},{"year":2025,"month":2,"collateral":"RV/Campers","revenue":237774.62,"cost":46757.0,"net_profit":191017.62},{"year":2025,"month":3,"collateral":"Cargo/Utility","revenue":1112310.3899999999,"cost":244850.0,"net_profit":867460.39},{"year":2025,"month":3,"collateral":"Horse/Stock Trailer","revenue":32797.75,"cost":3928.0,"net_profit":28869.75},{"year":2025,"month":3,"collateral":"Marine","revenue":78976.59,"cost":11041.0,"net_profit":67935.59},{"year":2025,"month":3,"collateral":"RV/Campers","revenue":315874.72,"cost":72941.0,"net_profit":242933.72},{"year":2025,"month":4,"collateral":"Cargo/Utility","revenue":1190338.1899999999,"cost":248464.0,"net_profit":941874.1899999999},{"year":2025,"month":4,"collateral":"Horse/Stock Trailer","revenue":77552.73,"cost":15754.0,"net_profit":61798.73},{"year":2025,"month":4,"collateral":"Marine","revenue":142596.65,"cost":26981.0,"net_profit":115615.65},{"year":2025,"month":4,"collateral":"RV/Campers","revenue":450088.0,"cost":113460.0,"net_profit":336628.0},{"year":2025,"month":5,"collateral":"Cargo/Utility","revenue":1137073.6100000001,"cost":235330.28,"net_profit":901743.33},{"year":2025,"month":5,"collateral":"Horse/Stock Trailer","revenue":56311.1,"cost":6762.0,"net_profit":49549.1},{"year":2025,"month":5,"collateral":"Marine","revenue":202130.62,"cost":39702.0,"net_profit":162428.62},{"year":2025,"month":5,"collateral":"RV/Campers","revenue":557111.83,"cost":130359.0,"net_profit":426752.83},{"year":2025,"month":6,"collateral":"Cargo/Utility","revenue":1171391.8300000001,"cost":253938.0,"net_profit":917453.83},{"year":2025,"month":6,"collateral":"Horse/Stock Trailer","revenue":62302.94,"cost":7454.0,"net_profit":54848.94},{"year":2025,"month":6,"collateral":"Marine","revenue":203956.59,"cost":34265.0,"net_profit":169691.59},{"year":2025,"month":6,"collateral":"RV/Campers","revenue":725910.27,"cost":144467.0,"net_profit":581443.27},{"year":2025,"month":7,"collateral":"Cargo/Utility","revenue":1254917.6200000001,"cost":281273.0,"net_profit":973644.62},{"year":2025,"month":7,"collateral":"Horse/Stock Trailer","revenue":61516.32,"cost":10326.0,"net_profit":51190.32},{"year":2025,"month":7,"collateral":"Marine","revenue":254184.66,"cost":37365.0,"net_profit":216819.66},{"year":2025,"month":7,"collateral":"RV/Campers","revenue":779987.15,"cost":197766.0,"net_profit":582221.15},{"year":2025,"month":8,"collateral":"Cargo/Utility","revenue":1223279.4399999999,"cost":255372.0,"net_profit":967907.4399999999},{"year":2025,"month":8,"collateral":"Horse/Stock Trailer","revenue":85068.23,"cost":12619.0,"net_profit":72449.23},{"year":2025,"month":8,"collateral":"Marine","revenue":143876.26,"cost":23578.0,"net_profit":120298.26},{"year":2025,"month":8,"collateral":"RV/Campers","revenue":524550.34,"cost":95617.0,"net_profit":428933.34},{"year":2025,"month":9,"collateral":"Cargo/Utility","revenue":1412396.8600000001,"cost":304830.0,"net_profit":1107566.8600000001},{"year":2025,"month":9,"collateral":"Horse/Stock Trailer","revenue":102369.97,"cost":16233.0,"net_profit":86136.97},{"year":2025,"month":9,"collateral":"Marine","revenue":39246.68,"cost":4913.0,"net_profit":34333.68},{"year":2025,"month":9,"collateral":"RV/Campers","revenue":445024.6,"cost":96597.0,"net_profit":348427.6},{"year":2025,"month":10,"collateral":"Cargo/Utility","revenue":1631350.99,"cost":341500.0,"net_profit":1289850.99},{"year":2025,"month":10,"collateral":"Horse/Stock Trailer","revenue":77361.0,"cost":12336.0,"net_profit":65025.0},{"year":2025,"month":10,"collateral":"Marine","revenue":29884.39,"cost":5003.0,"net_profit":24881.39},{"year":2025,"month":10,"collateral":"RV/Campers","revenue":431776.92,"cost":93587.0,"net_profit":338189.92},{"year":2025,"month":11,"collateral":"Cargo/Utility","revenue":1241959.6399999999,"cost":259938.0,"net_profit":982021.64},{"year":2025,"month":11,"collateral":"Horse/Stock Trailer","revenue":78095.04,"cost":15543.0,"net_profit":62552.04},{"year":2025,"month":11,"collateral":"Marine","revenue":36590.75,"cost":9522.0,"net_profit":27068.75},{"year":2025,"month":11,"collateral":"RV/Campers","revenue":245315.87,"cost":65337.0,"net_profit":179978.87},{"year":2025,"month":12,"collateral":"Cargo/Utility","revenue":1070031.22,"cost":220795.0,"net_profit":849236.22},{"year":2025,"month":12,"collateral":"Horse/Stock Trailer","revenue":61128.41,"cost":12402.0,"net_profit":48726.41},{"year":2025,"month":12,"collateral":"Marine","revenue":57336.5,"cost":13468.0,"net_profit":43868.5},{"year":2025,"month":12,"collateral":"RV/Campers","revenue":298650.46,"cost":68128.0,"net_profit":230522.46},{"year":2026,"month":1,"collateral":"Cargo/Utility","revenue":1352033.28,"cost":288709.0,"net_profit":1063324.28},{"year":2026,"month":1,"collateral":"Horse/Stock Trailer","revenue":40373.4,"cost":7424.0,"net_profit":32949.4},{"year":2026,"month":1,"collateral":"Marine","revenue":25660.23,"cost":2100.0,"net_profit":23560.23},{"year":2026,"month":1,"collateral":"RV/Campers","revenue":225940.91,"cost":51248.0,"net_profit":174692.91},{"year":2026,"month":2,"collateral":"Cargo/Utility","revenue":1493524.8700000001,"cost":309936.0,"net_profit":1183588.8700000001},{"year":2026,"month":2,"collateral":"Horse/Stock Trailer","revenue":38564.35,"cost":6019.0,"net_profit":32545.35},{"year":2026,"month":2,"collateral":"Marine","revenue":65663.56,"cost":11052.0,"net_profit":54611.56},{"year":2026,"month":2,"collateral":"RV/Campers","revenue":289090.44,"cost":63813.0,"net_profit":225277.44},{"year":2026,"month":3,"collateral":"Cargo/Utility","revenue":1855423.53,"cost":364851.0,"net_profit":1490572.53},{"year":2026,"month":3,"collateral":"Horse/Stock Trailer","revenue":70108.85,"cost":8840.0,"net_profit":61268.85},{"year":2026,"month":3,"collateral":"Marine","revenue":78185.8,"cost":8805.0,"net_profit":69380.8},{"year":2026,"month":3,"collateral":"RV/Campers","revenue":349003.49,"cost":84919.0,"net_profit":264084.49}];
 
 // ─── AUTH ────────────────────────────────────────────────────────
 async function login(e) {
@@ -465,6 +528,12 @@ const R=v=>v==null?'—':Number(v).toFixed(2);
 const P=v=>v==null?'—':(Number(v)*100).toFixed(1)+'%';
 const M=d=>{const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-US',{month:'short',year:'2-digit'});};
 const Q=q=>`Q${q}`;
+const $K=v=>v==null?'—':'$'+(Number(v)/1000).toFixed(0)+'K';
+const $M=v=>v==null?'—':'$'+(Number(v)/1e6).toFixed(1)+'M';
+const N=v=>v==null?'—':Number(v).toLocaleString();
+const VAR=(fc,act)=>{if(fc==null||act==null||fc===0)return'—';return((act-fc)/fc*100).toFixed(1)+'%';};
+const MM=(yr,mo)=>{const dt=new Date(yr,mo-1,1);return dt.toLocaleDateString('en-US',{month:'short',year:'2-digit'});};
+
 function delta(cur,prv,fmt){
   if(!prv||cur==null||prv==null)return'';
   const d=Number(cur)-Number(prv);const cls=d>=0?'up':'down';const a=d>=0?'↑':'↓';
@@ -496,12 +565,13 @@ function navigate(page){
   document.querySelectorAll('.page').forEach(p=>p.style.display='none');
   document.getElementById('page-'+page).style.display='block';
   document.querySelectorAll('.nav-item').forEach(n=>{n.classList.toggle('active',n.dataset.page===page);});
-  const titles={dashboard:'KPI Dashboard',cashflow:'Cash Flow Analysis',pnl:'P&L Analysis',clg:'Cargo Loss Guarantee',loantape:'Loan Tape Analytics',scenarios:'Scenario Testing'};
+  const titles={dashboard:'KPI Dashboard',cashflow:'Cash Flow Analysis',pnl:'P&L Analysis',origrev:'Originations & Revenue',clg:'Cargo Loss Guarantee',loantape:'Loan Tape Analytics',scenarios:'Scenario Testing'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   if(page==='dashboard')renderDashboard();
   if(page==='cashflow')renderCashFlow();
   if(page==='pnl')renderPnL();
   if(page==='clg')renderCLG();
+  if(page==='origrev')renderOrigRev();
 }
 
 // ─── DATA LOAD ───────────────────────────────────────────────────
@@ -534,15 +604,22 @@ function renderDashboard(){
   const d=filt(kpiData,viewFilter);
   if(!d.length){document.getElementById('kpiCards').innerHTML='<div class="card card-sm"><div class="card-value">No data</div></div>';return;}
   const L=d[d.length-1], P2=d.length>1?d[d.length-2]:null;
+
+  // Compute forecast totals from FORECAST_2026
+  const fcTotalCount=FORECAST_2026.reduce((s,r)=>s+(Number(r.orig_count)||0),0);
+  const fcTotalGPRev=FORECAST_2026.reduce((s,r)=>s+(Number(r.gp_revenue)||0),0);
+  const fcTotalGPNet=FORECAST_2026.reduce((s,r)=>s+(Number(r.gp_net_profit)||0),0);
+  const fcNetMargin=fcTotalGPRev>0?(fcTotalGPNet/fcTotalGPRev*100).toFixed(1)+'%':'—';
+
   const cards=[
     {t:'Cash Position',v:$(L.cash),d:delta(L.cash,P2?.cash,'$'),s:L.is_forecast?'Forecast':'Actual'},
     {t:'Current Ratio',v:R(L.current_ratio),d:delta(L.current_ratio,P2?.current_ratio,'r'),s:Number(L.current_ratio)>=1.5?'✓ Healthy':'⚠ Below 1.5x'},
     {t:'Debt / Equity',v:R(L.debt_to_equity),d:delta(L.debt_to_equity,P2?.debt_to_equity,'r'),s:Number(L.debt_to_equity)<1?'✓ Low leverage':'Leveraged'},
     {t:'ROE (Ann.)',v:P(L.roe_annualized),d:'',s:L.is_forecast?'Projected':'Trailing'},
-    {t:'Net Income',v:$(L.net_income),d:delta(L.net_income,P2?.net_income,'$'),s:M(L.period)},
-    {t:'Cash Flow',v:$(L.cf_total),d:delta(L.cf_total,P2?.cf_total,'$'),s:'Monthly total'},
-    {t:'Quick Ratio',v:R(L.quick_ratio),d:delta(L.quick_ratio,P2?.quick_ratio,'r'),s:Number(L.quick_ratio)>=1?'✓ Adequate':'⚠ Tight'},
-    {t:'Cash Ratio',v:R(L.cash_ratio),d:delta(L.cash_ratio,P2?.cash_ratio,'r'),s:'Pure liquidity'}
+    {t:'Forecast Originations',v:N(fcTotalCount),d:'',s:'2026 full year'},
+    {t:'Forecast GP Revenue',v:$M(fcTotalGPRev),d:'',s:'2026 full year'},
+    {t:'Forecast Net Profit',v:$M(fcTotalGPNet),d:'',s:'2026 full year'},
+    {t:'Net Margin %',v:fcNetMargin,d:'',s:'GP Net / GP Revenue'}
   ];
   document.getElementById('kpiCards').innerHTML=cards.map(c=>`<div class="card card-sm"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div>${c.d}<div class="card-sub">${c.s}</div></div>`).join('');
 
@@ -926,6 +1003,292 @@ function renderCLG(){
   }).join('');
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// ORIGINATIONS & REVENUE PAGE
+// ═══════════════════════════════════════════════════════════════════
+const COLLATERALS=['Cargo/Utility','Horse/Stock Trailer','Marine','RV/Campers'];
+const COLL_COLORS={'Cargo/Utility':'#7c6cf0','Horse/Stock Trailer':'#4dabf7','Marine':'#00c9a7','RV/Campers':'#ffa94d'};
+const COLL_BG={'Cargo/Utility':'rgba(124,108,240,0.7)','Horse/Stock Trailer':'rgba(77,171,247,0.7)','Marine':'rgba(0,201,167,0.7)','RV/Campers':'rgba(255,169,77,0.7)'};
+
+function renderOrigRev(){
+  if(orSubTab==='originations') renderOriginations();
+  else renderGrossProfit();
+}
+
+function renderOriginations(){
+  // Update titles
+  document.getElementById('orMainChartTitle').textContent='Origination Count by Month';
+  document.getElementById('orChart2Title').textContent='Origination $ by Collateral';
+  document.getElementById('orChart3Title').textContent='Forecast vs Actual (Count)';
+  document.getElementById('orTableTitle').textContent='Monthly Origination Detail';
+  document.getElementById('orTableHead').innerHTML='<th>Period</th><th>Collateral</th><th>Count (FC)</th><th>Count (Act)</th><th>Var %</th><th>Amount (FC)</th><th>Amount (Act)</th><th>Var %</th><th>Type</th>';
+
+  const fc=FORECAST_2026;
+  const actuals=orActualsOrig;
+  const months=[1,2,3,4,5,6,7,8,9,10,11,12];
+  const monthLabels=months.map(m=>MM(2026,m));
+
+  // Totals
+  const totalFcCount=fc.reduce((s,r)=>s+(r.orig_count||0),0);
+  const totalFcAmt=fc.reduce((s,r)=>s+(r.orig_amount||0),0);
+  // YTD actuals
+  let ytdActCount=null, ytdActAmt=null, variances=[];
+  if(actuals.length){
+    ytdActCount=actuals.reduce((s,r)=>s+(Number(r.count)||0),0);
+    ytdActAmt=actuals.reduce((s,r)=>s+(Number(r.amount)||0),0);
+    // compute variance per month that has both fc and actuals
+    const actMonths=[...new Set(actuals.map(r=>r.month))];
+    actMonths.forEach(mo=>{
+      const fcMonth=fc.filter(r=>r.month===mo);
+      const actMonth=actuals.filter(r=>r.month===mo);
+      const fcCount=fcMonth.reduce((s,r)=>s+(r.orig_count||0),0);
+      const actCount=actMonth.reduce((s,r)=>s+(Number(r.count)||0),0);
+      if(fcCount>0) variances.push(Math.abs((actCount-fcCount)/fcCount*100));
+    });
+  }
+  const avgVar=variances.length?(variances.reduce((a,b)=>a+b,0)/variances.length).toFixed(1)+'%':'—';
+
+  const cards=[
+    {t:'2026 Forecast Loans',v:N(totalFcCount),d:'',s:'Full year total'},
+    {t:'2026 Forecast Volume',v:$M(totalFcAmt),d:'',s:'Full year total'},
+    {t:'YTD Actual Loans',v:ytdActCount!=null?N(ytdActCount):'—',d:'',s:actuals.length?`${[...new Set(actuals.map(r=>r.month))].length} months uploaded`:'No actuals uploaded'},
+    {t:'Forecast Accuracy',v:avgVar,d:'',s:variances.length?'Avg absolute variance':'No actuals to compare'}
+  ];
+  document.getElementById('orKpiCards').innerHTML=cards.map(c=>`<div class="card card-sm"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div>${c.d}<div class="card-sub">${c.s}</div></div>`).join('');
+
+  // Chart 1: Stacked bar — orig count by collateral by month
+  const datasets1=COLLATERALS.map(coll=>({
+    label:coll,
+    data:months.map(m=>{
+      const row=fc.find(r=>r.month===m&&r.collateral===coll);
+      return row?row.orig_count:0;
+    }),
+    backgroundColor:COLL_BG[coll],
+    borderRadius:2
+  }));
+  // Overlay actuals as line if available
+  if(actuals.length){
+    const actTotals=months.map(m=>{
+      const rows=actuals.filter(r=>r.month===m);
+      return rows.length?rows.reduce((s,r)=>s+(Number(r.count)||0),0):null;
+    });
+    datasets1.push({label:'Actual Total',data:actTotals,type:'line',borderColor:'#fff',borderWidth:2,pointRadius:3,pointBackgroundColor:'#fff',tension:.3,yAxisID:'y'});
+  }
+  mk('orMainChart','bar',{labels:monthLabels,datasets:datasets1},{plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},scales:{...CD.scales,x:{...CD.scales.x,stacked:true},y:{...CD.scales.y,stacked:true}}});
+
+  // Chart 2: Stacked bar — orig amount by collateral
+  const datasets2=COLLATERALS.map(coll=>({
+    label:coll,
+    data:months.map(m=>{
+      const row=fc.find(r=>r.month===m&&r.collateral===coll);
+      return row?row.orig_amount:0;
+    }),
+    backgroundColor:COLL_BG[coll],
+    borderRadius:2
+  }));
+  mk('orChart2','bar',{labels:monthLabels,datasets:datasets2},{plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},scales:{...CD.scales,x:{...CD.scales.x,stacked:true},y:{...CD.scales.y,stacked:true,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Chart 3: Forecast vs Actual line
+  const fcTotals=months.map(m=>fc.filter(r=>r.month===m).reduce((s,r)=>s+(r.orig_count||0),0));
+  const actTotals3=months.map(m=>{
+    if(!actuals.length)return null;
+    const rows=actuals.filter(r=>r.month===m);
+    return rows.length?rows.reduce((s,r)=>s+(Number(r.count)||0),0):null;
+  });
+  const ds3=[{label:'Forecast',data:fcTotals,borderColor:'#7c6cf0',tension:.3,pointRadius:2}];
+  if(actuals.length){
+    ds3.push({label:'Actual',data:actTotals3,borderColor:'#00c9a7',tension:.3,pointRadius:3,borderWidth:2});
+    // Shaded variance area
+    ds3.push({label:'Variance',data:fcTotals,borderColor:'transparent',backgroundColor:'rgba(124,108,240,0.06)',fill:'+1',pointRadius:0});
+  }
+  mk('orChart3','line',{labels:monthLabels,datasets:ds3},{scales:CD.scales});
+
+  // Table
+  const rows=[];
+  months.forEach(m=>{
+    COLLATERALS.forEach(coll=>{
+      const fcRow=fc.find(r=>r.month===m&&r.collateral===coll);
+      const actRow=actuals.find(r=>r.month===m&&r.collateral===coll);
+      const fcCount=fcRow?fcRow.orig_count:0;
+      const fcAmt=fcRow?fcRow.orig_amount:0;
+      const actCount=actRow?Number(actRow.count):null;
+      const actAmt=actRow?Number(actRow.amount):null;
+      const varCount=VAR(fcCount,actCount);
+      const varAmt=VAR(fcAmt,actAmt);
+      const type=actRow?'Act':(fcRow&&fcRow.is_forecast?'FC':'Act');
+      const isFc=fcRow&&fcRow.is_forecast&&!actRow;
+      rows.push(`<tr class="${isFc?'fc':''}"><td>${MM(2026,m)}</td><td>${coll}</td><td>${N(fcCount)}</td><td>${actCount!=null?N(actCount):'—'}</td><td class="${varCount!=='—'&&parseFloat(varCount)>=0?'variance-pos':'variance-neg'}">${varCount}</td><td>${$(fcAmt)}</td><td>${actAmt!=null?$(actAmt):'—'}</td><td class="${varAmt!=='—'&&parseFloat(varAmt)>=0?'variance-pos':'variance-neg'}">${varAmt}</td><td>${type}</td></tr>`);
+    });
+  });
+  document.getElementById('orTableCount').textContent=`${rows.length} rows`;
+  document.getElementById('orTBody').innerHTML=rows.join('');
+}
+
+function renderGrossProfit(){
+  // Update titles
+  document.getElementById('orMainChartTitle').textContent='GP Revenue by Month';
+  document.getElementById('orChart2Title').textContent='Net Profit by Collateral';
+  document.getElementById('orChart3Title').textContent='Forecast vs Actual (GP Revenue)';
+  document.getElementById('orTableTitle').textContent='Monthly Gross Profit Detail';
+  document.getElementById('orTableHead').innerHTML='<th>Period</th><th>Collateral</th><th>Revenue (FC)</th><th>Revenue (Act)</th><th>Var %</th><th>Net Profit (FC)</th><th>Net Profit (Act)</th><th>Var %</th><th>Type</th>';
+
+  const fc=FORECAST_2026;
+  const actuals=orActualsGP;
+  const months=[1,2,3,4,5,6,7,8,9,10,11,12];
+  const monthLabels=months.map(m=>MM(2026,m));
+
+  const totalFcRev=fc.reduce((s,r)=>s+(r.gp_revenue||0),0);
+  const totalFcNet=fc.reduce((s,r)=>s+(r.gp_net_profit||0),0);
+  const netMargin=totalFcRev>0?(totalFcNet/totalFcRev*100).toFixed(1)+'%':'—';
+
+  let ytdActGP=null, variances=[];
+  if(actuals.length){
+    ytdActGP=actuals.reduce((s,r)=>s+(Number(r.revenue)||0),0);
+    const actMonths=[...new Set(actuals.map(r=>r.month))];
+    actMonths.forEach(mo=>{
+      const fcMonth=fc.filter(r=>r.month===mo);
+      const actMonth=actuals.filter(r=>r.month===mo);
+      const fcRev=fcMonth.reduce((s,r)=>s+(r.gp_revenue||0),0);
+      const actRev=actMonth.reduce((s,r)=>s+(Number(r.revenue)||0),0);
+      if(fcRev>0) variances.push(Math.abs((actRev-fcRev)/fcRev*100));
+    });
+  }
+
+  const cards=[
+    {t:'2026 GP Revenue',v:$M(totalFcRev),d:'',s:'Full year forecast'},
+    {t:'2026 Net Profit',v:$M(totalFcNet),d:'',s:'Full year forecast'},
+    {t:'YTD Actual GP',v:ytdActGP!=null?$M(ytdActGP):'—',d:'',s:actuals.length?`${[...new Set(actuals.map(r=>r.month))].length} months uploaded`:'No actuals uploaded'},
+    {t:'Net Margin %',v:netMargin,d:'',s:'GP Net / GP Revenue'}
+  ];
+  document.getElementById('orKpiCards').innerHTML=cards.map(c=>`<div class="card card-sm"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div>${c.d}<div class="card-sub">${c.s}</div></div>`).join('');
+
+  // Chart 1: Stacked bar — gp_revenue by collateral by month
+  const datasets1=COLLATERALS.map(coll=>({
+    label:coll,
+    data:months.map(m=>{
+      const row=fc.find(r=>r.month===m&&r.collateral===coll);
+      return row?row.gp_revenue:0;
+    }),
+    backgroundColor:COLL_BG[coll],
+    borderRadius:2
+  }));
+  if(actuals.length){
+    const actTotals=months.map(m=>{
+      const rows=actuals.filter(r=>r.month===m);
+      return rows.length?rows.reduce((s,r)=>s+(Number(r.revenue)||0),0):null;
+    });
+    datasets1.push({label:'Actual Total',data:actTotals,type:'line',borderColor:'#fff',borderWidth:2,pointRadius:3,pointBackgroundColor:'#fff',tension:.3,yAxisID:'y'});
+  }
+  mk('orMainChart','bar',{labels:monthLabels,datasets:datasets1},{plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},scales:{...CD.scales,x:{...CD.scales.x,stacked:true},y:{...CD.scales.y,stacked:true,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Chart 2: Stacked bar — gp_net_profit by collateral
+  const datasets2=COLLATERALS.map(coll=>({
+    label:coll,
+    data:months.map(m=>{
+      const row=fc.find(r=>r.month===m&&r.collateral===coll);
+      return row?row.gp_net_profit:0;
+    }),
+    backgroundColor:COLL_BG[coll],
+    borderRadius:2
+  }));
+  mk('orChart2','bar',{labels:monthLabels,datasets:datasets2},{plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},scales:{...CD.scales,x:{...CD.scales.x,stacked:true},y:{...CD.scales.y,stacked:true,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Chart 3: Forecast vs Actual GP Revenue line
+  const fcTotals=months.map(m=>fc.filter(r=>r.month===m).reduce((s,r)=>s+(r.gp_revenue||0),0));
+  const actTotals3=months.map(m=>{
+    if(!actuals.length)return null;
+    const rows=actuals.filter(r=>r.month===m);
+    return rows.length?rows.reduce((s,r)=>s+(Number(r.revenue)||0),0):null;
+  });
+  const ds3=[{label:'Forecast',data:fcTotals,borderColor:'#7c6cf0',tension:.3,pointRadius:2}];
+  if(actuals.length){
+    ds3.push({label:'Actual',data:actTotals3,borderColor:'#00c9a7',tension:.3,pointRadius:3,borderWidth:2});
+    ds3.push({label:'Variance',data:fcTotals,borderColor:'transparent',backgroundColor:'rgba(124,108,240,0.06)',fill:'+1',pointRadius:0});
+  }
+  mk('orChart3','line',{labels:monthLabels,datasets:ds3},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}});
+
+  // Table
+  const rows=[];
+  months.forEach(m=>{
+    COLLATERALS.forEach(coll=>{
+      const fcRow=fc.find(r=>r.month===m&&r.collateral===coll);
+      const actRow=actuals.find(r=>r.month===m&&r.collateral===coll);
+      const fcRev=fcRow?fcRow.gp_revenue:0;
+      const fcNet=fcRow?fcRow.gp_net_profit:0;
+      const actRev=actRow?Number(actRow.revenue):null;
+      const actNet=actRow?Number(actRow.net_profit):null;
+      const varRev=VAR(fcRev,actRev);
+      const varNet=VAR(fcNet,actNet);
+      const type=actRow?'Act':(fcRow&&fcRow.is_forecast?'FC':'Act');
+      const isFc=fcRow&&fcRow.is_forecast&&!actRow;
+      rows.push(`<tr class="${isFc?'fc':''}"><td>${MM(2026,m)}</td><td>${coll}</td><td>${$(fcRev)}</td><td>${actRev!=null?$(actRev):'—'}</td><td class="${varRev!=='—'&&parseFloat(varRev)>=0?'variance-pos':'variance-neg'}">${varRev}</td><td>${$(fcNet)}</td><td>${actNet!=null?$(actNet):'—'}</td><td class="${varNet!=='—'&&parseFloat(varNet)>=0?'variance-pos':'variance-neg'}">${varNet}</td><td>${type}</td></tr>`);
+    });
+  });
+  document.getElementById('orTableCount').textContent=`${rows.length} rows`;
+  document.getElementById('orTBody').innerHTML=rows.join('');
+}
+
+// ─── CSV UPLOAD HANDLER ──────────────────────────────────────────
+function parseCSV(text){
+  const lines=text.trim().split('\n');
+  if(lines.length<2)return[];
+  const headers=lines[0].split(',').map(h=>h.trim().toLowerCase().replace(/['"]/g,''));
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const vals=lines[i].split(',').map(v=>v.trim().replace(/['"]/g,''));
+    if(vals.length<headers.length)continue;
+    const obj={};
+    headers.forEach((h,j)=>{obj[h]=vals[j];});
+    // Convert numeric fields
+    if(obj.year)obj.year=Number(obj.year);
+    if(obj.month)obj.month=Number(obj.month);
+    if(obj.count)obj.count=Number(obj.count);
+    if(obj.amount)obj.amount=Number(obj.amount);
+    if(obj.revenue)obj.revenue=Number(obj.revenue);
+    if(obj.cost)obj.cost=Number(obj.cost);
+    if(obj.net_profit)obj.net_profit=Number(obj.net_profit);
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function handleActualsFile(file){
+  if(!file)return;
+  const statusEl=document.getElementById('uploadStatus');
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const text=e.target.result;
+      const rows=parseCSV(text);
+      if(!rows.length){statusEl.textContent='No data rows found';statusEl.style.display='block';statusEl.style.color='var(--red)';return;}
+      // Detect type
+      const headers=Object.keys(rows[0]);
+      if(headers.includes('count')){
+        orActualsOrig=rows;
+        try{localStorage.setItem('ampiq_actuals_orig',JSON.stringify(rows));}catch(ex){}
+        statusEl.textContent=`Loaded ${rows.length} origination actuals`;
+      } else if(headers.includes('revenue')){
+        orActualsGP=rows;
+        try{localStorage.setItem('ampiq_actuals_gp',JSON.stringify(rows));}catch(ex){}
+        statusEl.textContent=`Loaded ${rows.length} gross profit actuals`;
+      } else {
+        statusEl.textContent='Unrecognized columns. Need count/amount or revenue/cost/net_profit';
+        statusEl.style.color='var(--red)';
+        statusEl.style.display='block';
+        return;
+      }
+      statusEl.style.color='var(--green)';
+      statusEl.style.display='block';
+      renderOrigRev();
+    }catch(err){
+      statusEl.textContent='Parse error: '+err.message;
+      statusEl.style.color='var(--red)';
+      statusEl.style.display='block';
+    }
+  };
+  reader.readAsText(file);
+}
+
 // ─── EVENT LISTENERS ─────────────────────────────────────────────
 document.getElementById('loginForm').addEventListener('submit',login);
 document.getElementById('viewToggle').addEventListener('click',e=>{if(!e.target.dataset.v)return;viewFilter=e.target.dataset.v;e.target.parentNode.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');renderDashboard();});
@@ -935,6 +1298,30 @@ document.getElementById('plViewToggle').addEventListener('click',e=>{if(!e.targe
 document.getElementById('clgViewToggle').addEventListener('click',e=>{if(!e.target.dataset.v)return;clgViewFilter=e.target.dataset.v;e.target.parentNode.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');renderCLG();});
 document.getElementById('cutoffSlider').addEventListener('input',e=>{cutoffMonthIdx=Number(e.target.value);renderCLG();});
 document.getElementById('freezeToggle').addEventListener('click',e=>{if(!e.target.dataset.f)return;sub600Freeze=e.target.dataset.f==='on';e.target.parentNode.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');renderCLG();});
+
+// Originations sub-tab toggle
+document.getElementById('orSubTab').addEventListener('click',e=>{if(!e.target.dataset.t)return;orSubTab=e.target.dataset.t;e.target.parentNode.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');renderOrigRev();});
+
+// Upload zone events
+(function(){
+  const zone=document.getElementById('actualsUploadZone');
+  const fileInput=document.getElementById('actualsFileInput');
+  zone.addEventListener('click',()=>fileInput.click());
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
+  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');if(e.dataTransfer.files.length)handleActualsFile(e.dataTransfer.files[0]);});
+  fileInput.addEventListener('change',e=>{if(e.target.files.length)handleActualsFile(e.target.files[0]);});
+})();
+
+// Restore actuals from localStorage
+(function(){
+  try{
+    const savedOrig=localStorage.getItem('ampiq_actuals_orig');
+    if(savedOrig)orActualsOrig=JSON.parse(savedOrig);
+    const savedGP=localStorage.getItem('ampiq_actuals_gp');
+    if(savedGP)orActualsGP=JSON.parse(savedGP);
+  }catch(ex){}
+})();
 
 // ─── INIT ────────────────────────────────────────────────────────
 const token=localStorage.getItem('ampiq_token');
