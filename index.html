@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>&#913;&#916; IQ &#8212; AI CFO Platform | Rock Solid Funding</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --bg:#0b0d14; --surface:#131620; --surface2:#1a1e2e; --surface3:#222738;
@@ -159,6 +160,26 @@ tr:hover td{background:rgba(124,108,240,0.03);}
   .sidebar-brand h1{font-size:14px;}.main{margin-left:60px;}
   .grid-4,.grid-3{grid-template-columns:1fr 1fr;}.grid-2{grid-template-columns:1fr;}
 }
+/* ── Loan Tape ── */
+.lt-strat-controls{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end;}
+.lt-strat-group{display:flex;flex-direction:column;gap:4px;}
+.lt-strat-group label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);font-weight:500;}
+.lt-strat-group select,.lt-strat-group input[type=text]{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;}
+.lt-strat-group select:focus,.lt-strat-group input:focus{outline:none;border-color:var(--accent);}
+.insight-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;}
+.insight-card .insight-rank{font-size:11px;color:var(--accent2);font-weight:600;margin-bottom:4px;}
+.insight-card .insight-title{font-size:13px;font-weight:600;margin-bottom:6px;}
+.insight-card .insight-body{font-size:12px;color:var(--text2);line-height:1.5;}
+.insight-card .insight-action{font-size:11px;color:var(--green);margin-top:8px;font-weight:500;}
+.mob-legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;}
+.mob-legend span{font-size:11px;display:flex;align-items:center;gap:4px;}
+.mob-legend span::before{content:'';display:inline-block;width:12px;height:3px;border-radius:2px;}
+.summary-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);}
+.summary-strip .ss-item{text-align:center;}
+.summary-strip .ss-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:4px;}
+.summary-strip .ss-value{font-size:18px;font-weight:700;}
+.summary-strip .ss-sub{font-size:10px;color:var(--text2);margin-top:2px;}
+@media(max-width:900px){.summary-strip{grid-template-columns:repeat(2,1fr);}.lt-strat-controls{flex-direction:column;}}
 </style>
 </head>
 <body>
@@ -212,14 +233,14 @@ tr:hover td{background:rgba(124,108,240,0.03);}
       <span class="icon">🛡️</span><span>CLG Model</span><span class="badge live">Live</span>
     </div>
     <div class="nav-item" data-page="loantape" onclick="navigate('loantape')">
-      <span class="icon">🏦</span><span>Loan Tape</span><span class="badge">Q3</span>
+      <span class="icon">🏦</span><span>Loan Tape</span><span class="badge live">Live</span>
     </div>
     <div class="nav-item" data-page="scenarios" onclick="navigate('scenarios')">
       <span class="icon">🔮</span><span>Scenarios</span><span class="badge">Q3</span>
     </div>
   </nav>
   <div class="sidebar-footer">
-    <span>v0.3.0 &#183; Amplifi Intelligence</span>
+    <span>v0.4.0 &#183; Amplifi Intelligence</span>
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
 </aside>
@@ -242,6 +263,7 @@ tr:hover td{background:rgba(124,108,240,0.03);}
 
     <!-- ═══ DASHBOARD PAGE ═══ -->
     <div id="page-dashboard" class="page">
+      <div class="summary-strip" id="summaryStrip"><div class="loading"><div class="spinner"></div>Loading summary…</div></div>
       <div class="controls">
         <div class="pill-group" id="viewToggle">
           <button class="pill active" data-v="all">All</button>
@@ -252,6 +274,8 @@ tr:hover td{background:rgba(124,108,240,0.03);}
           <button class="pill active" data-c="liquidity">Liquidity</button>
           <button class="pill" data-c="ratios">Ratios</button>
           <button class="pill" data-c="cashflow">Cash Flow</button>
+          <button class="pill" data-c="originations">Originations</button>
+          <button class="pill" data-c="grossprofit">Gross Profit</button>
         </div>
       </div>
       <div class="grid grid-4" id="kpiCards"><div class="card"><div class="loading"><div class="spinner"></div>Loading KPIs…</div></div></div>
@@ -292,7 +316,7 @@ tr:hover td{background:rgba(124,108,240,0.03);}
         <div class="table-header"><h3>Cash Flow Detail</h3><span id="cfTableCount"></span></div>
         <div class="table-scroll">
           <table><thead><tr>
-            <th>Period</th><th>Net Income</th><th>Amort</th><th>ΔAR</th><th>ΔAP</th><th>Distrib</th><th>LG Settle</th><th>CF Total</th><th>Cash End</th><th>Type</th>
+            <th>Period</th><th>Net Income</th><th>Amort</th><th>ΔAR</th><th<ΔAP</th><th>Distrib</th><th>LG Settle</th><th>CF Total</th><th>Cash End</th><th>Type</th>
           </tr></thead><tbody id="cfTBody"></tbody></table>
         </div>
       </div>
@@ -386,11 +410,66 @@ tr:hover td{background:rgba(124,108,240,0.03);}
 
     <!-- ═══ LOAN TAPE PAGE ═══ -->
     <div id="page-loantape" class="page" style="display:none;">
-      <div class="module-placeholder">
-        <div class="icon-big">🏦</div>
-        <h3>Loan Tape Analytics</h3>
-        <p>Portfolio-level metrics, vintage analysis, delinquency tracking, concentration risk heatmaps, and automated tape reconciliation against your Supabase loan records.</p>
-        <span class="tag tag-coming">Roadmap · Q3 2026</span>
+      <div class="upload-zone" id="ltUploadZone">
+        <div class="uz-icon">📎</div>
+        <div class="uz-title">Drop loan tape here (CSV or XLSX)</div>
+        <div class="uz-sub">Auto-detects columns: account, FICO, loan amount, APR, term, state, open date, charge-off date, DPD snapshots</div>
+        <input type="file" id="ltFileInput" accept=".csv,.xlsx,.xls">
+        <div class="upload-status" id="ltUploadStatus"></div>
+      </div>
+      <div id="ltDashboard" style="display:none;">
+        <div class="grid grid-4" id="ltKpiCards"></div>
+        <div class="lt-strat-controls" id="ltStratControls">
+          <div class="lt-strat-group">
+            <label>Stratify By</label>
+            <select id="ltStratBy">
+              <option value="fico">FICO Band</option>
+              <option value="term">Term</option>
+              <option value="apr">APR Band</option>
+              <option value="state">State</option>
+              <option value="vintage">Vintage Year</option>
+              <option value="amount">Loan Amount</option>
+            </select>
+          </div>
+          <div class="lt-strat-group">
+            <label>FICO Breaks</label>
+            <input type="text" id="ltFicoBreaks" value="570,620,660,700,740" style="width:160px;">
+          </div>
+          <div class="lt-strat-group">
+            <label>Term Breaks (mo)</label>
+            <input type="text" id="ltTermBreaks" value="48,60,84,120,144" style="width:140px;">
+          </div>
+          <div class="lt-strat-group">
+            <label>APR Breaks (%)</label>
+            <input type="text" id="ltAprBreaks" value="10,12,14,16" style="width:120px;">
+          </div>
+          <div class="lt-strat-group">
+            <label>Amount Breaks ($)</label>
+            <input type="text" id="ltAmtBreaks" value="5000,10000,15000,20000" style="width:160px;">
+          </div>
+        </div>
+        <div class="grid grid-2" style="margin-bottom:16px;">
+          <div class="chart-card"><h3 id="ltChart1Title">Balance Distribution</h3><div class="chart-wrap"><canvas id="ltChart1"></canvas></div></div>
+          <div class="chart-card"><h3 id="ltChart2Title">Delinquency by Bucket</h3><div class="chart-wrap"><canvas id="ltChart2"></canvas></div></div>
+        </div>
+        <div class="grid grid-2" style="margin-bottom:16px;">
+          <div class="chart-card"><h3>MOB Curves — CGL by Vintage</h3><div class="chart-wrap"><canvas id="ltMobCgl"></canvas></div></div>
+          <div class="chart-card"><h3>MOB Curves — CNL by Vintage</h3><div class="chart-wrap"><canvas id="ltMobCnl"></canvas></div></div>
+        </div>
+        <div class="grid grid-2" style="margin-bottom:16px;">
+          <div class="chart-card"><h3>Terminal CGL/CNL Forecast</h3><div class="chart-wrap"><canvas id="ltTerminalChart"></canvas></div></div>
+          <div class="chart-card"><h3>Charge-Off Rate by FICO</h3><div class="chart-wrap"><canvas id="ltCoFicoChart"></canvas></div></div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:16px;">
+          <div class="table-header"><h3 id="ltTableTitle">Stratification Detail</h3><span id="ltTableCount"></span></div>
+          <div class="table-scroll">
+            <table><thead><tr id="ltTableHead">
+              <th>Bucket</th><th>Count</th><th>% Count</th><th>Balance</th><th>% Balance</th><th>Avg FICO</th><th>Avg APR</th><th>30+ DPD %</th><th>60+ DPD %</th><th>90+ DPD %</th><th>CO Rate %</th>
+            </tr></thead><tbody id="ltTBody"></tbody></table>
+          </div>
+        </div>
+        <h3 style="margin-bottom:12px;font-size:14px;">AI Insights</h3>
+        <div id="ltInsights"></div>
       </div>
     </div>
 
@@ -572,6 +651,7 @@ function navigate(page){
   if(page==='pnl')renderPnL();
   if(page==='clg')renderCLG();
   if(page==='origrev')renderOrigRev();
+  if(page==='loantape'&&ltData.length)renderLoanTape();
 }
 
 // ─── DATA LOAD ───────────────────────────────────────────────────
@@ -605,21 +685,38 @@ function renderDashboard(){
   if(!d.length){document.getElementById('kpiCards').innerHTML='<div class="card card-sm"><div class="card-value">No data</div></div>';return;}
   const L=d[d.length-1], P2=d.length>1?d[d.length-2]:null;
 
-  // Compute forecast totals from FORECAST_2026
-  const fcTotalCount=FORECAST_2026.reduce((s,r)=>s+(Number(r.orig_count)||0),0);
-  const fcTotalGPRev=FORECAST_2026.reduce((s,r)=>s+(Number(r.gp_revenue)||0),0);
-  const fcTotalGPNet=FORECAST_2026.reduce((s,r)=>s+(Number(r.gp_net_profit)||0),0);
-  const fcNetMargin=fcTotalGPRev>0?(fcTotalGPNet/fcTotalGPRev*100).toFixed(1)+'%':'—';
+  // Always-visible summary strip — 2025 actuals vs 2026 forecast
+  const hist2025Orig=HIST_ORIG.filter(r=>r.year===2025);
+  const hist2025GP=HIST_GP.filter(r=>r.year===2025);
+  const deals2025=hist2025Orig.reduce((s,r)=>s+(r.count||0),0);
+  const vol2025=hist2025Orig.reduce((s,r)=>s+(r.amount||0),0);
+  const gp2025=hist2025GP.reduce((s,r)=>s+(r.net_profit||0),0);
+  const gpRev2025=hist2025GP.reduce((s,r)=>s+(r.revenue||0),0);
+  const ni2025=plData.filter(r=>{const yr=new Date(r.period+'T00:00:00').getFullYear();return yr===2025&&!r.is_forecast;}).reduce((s,r)=>s+(Number(r.net_income)||0),0);
+  const netMargin2025=gpRev2025>0?(ni2025/gpRev2025*100).toFixed(1)+'%':'—';
 
+  const deals2026=FORECAST_2026.reduce((s,r)=>s+(r.orig_count||0),0);
+  const vol2026=FORECAST_2026.reduce((s,r)=>s+(r.orig_amount||0),0);
+  const gp2026=FORECAST_2026.reduce((s,r)=>s+(r.gp_net_profit||0),0);
+  const gpRev2026=FORECAST_2026.reduce((s,r)=>s+(r.gp_revenue||0),0);
+  const margin2025Pct=gpRev2025>0?ni2025/gpRev2025:0;
+  const ni2026Est=gpRev2026*margin2025Pct;
+  const netMargin2026=gpRev2026>0?(ni2026Est/gpRev2026*100).toFixed(1)+'%':'—';
+
+  document.getElementById('summaryStrip').innerHTML=[
+    {l:'Total Deals',a:N(deals2025),f:N(deals2026)},
+    {l:'Origination $',a:$M(vol2025),f:$M(vol2026)},
+    {l:'Gross Profit',a:$M(gp2025),f:$M(gp2026)},
+    {l:'Net Profit',a:$M(ni2025),f:$M(ni2026Est)},
+    {l:'Net Margin %',a:netMargin2025,f:netMargin2026}
+  ].map(i=>`<div class="ss-item"><div class="ss-label">${i.l}</div><div class="ss-value">${i.a}</div><div class="ss-sub">2025 Actual</div><div class="ss-value" style="font-size:14px;color:var(--accent2);margin-top:4px;">${i.f}</div><div class="ss-sub">2026 Forecast</div></div>`).join('');
+
+  // KPI cards — 4 financial health metrics only
   const cards=[
     {t:'Cash Position',v:$(L.cash),d:delta(L.cash,P2?.cash,'$'),s:L.is_forecast?'Forecast':'Actual'},
     {t:'Current Ratio',v:R(L.current_ratio),d:delta(L.current_ratio,P2?.current_ratio,'r'),s:Number(L.current_ratio)>=1.5?'✓ Healthy':'⚠ Below 1.5x'},
     {t:'Debt / Equity',v:R(L.debt_to_equity),d:delta(L.debt_to_equity,P2?.debt_to_equity,'r'),s:Number(L.debt_to_equity)<1?'✓ Low leverage':'Leveraged'},
-    {t:'ROE (Ann.)',v:P(L.roe_annualized),d:'',s:L.is_forecast?'Projected':'Trailing'},
-    {t:'Forecast Originations',v:N(fcTotalCount),d:'',s:'2026 full year'},
-    {t:'Forecast GP Revenue',v:$M(fcTotalGPRev),d:'',s:'2026 full year'},
-    {t:'Forecast Net Profit',v:$M(fcTotalGPNet),d:'',s:'2026 full year'},
-    {t:'Net Margin %',v:fcNetMargin,d:'',s:'GP Net / GP Revenue'}
+    {t:'ROE (Ann.)',v:P(L.roe_annualized),d:'',s:L.is_forecast?'Projected':'Trailing'}
   ];
   document.getElementById('kpiCards').innerHTML=cards.map(c=>`<div class="card card-sm"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div>${c.d}<div class="card-sub">${c.s}</div></div>`).join('');
 
@@ -644,6 +741,76 @@ function renderDashboard(){
       {label:'Cash',data:d.map(r=>Number(r.cash_ratio)),borderColor:'#00c9a7',tension:.3,pointRadius:2},
       {label:'Target 1.5x',data:d.map(()=>1.5),borderColor:'rgba(255,169,77,0.4)',borderDash:[4,4],pointRadius:0,borderWidth:1}
     ]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(1)+'x'}}}});
+  } else if(chartMode==='originations'){
+    document.getElementById('mainChartTitle').textContent='Originations — Count & Volume';
+    // Combine HIST_ORIG (2024-2025) + FORECAST_2026 for originations
+    const allOrigMonths=[];
+    const origByMonth={};
+    HIST_ORIG.forEach(r=>{
+      const key=r.year+'-'+(r.month<10?'0':'')+r.month;
+      if(!origByMonth[key])origByMonth[key]={label:MM(r.year,r.month),collaterals:{},total:0};
+      origByMonth[key].collaterals[r.collateral]=(origByMonth[key].collaterals[r.collateral]||0)+(r.count||0);
+      origByMonth[key].total+=(r.amount||0);
+    });
+    FORECAST_2026.forEach(r=>{
+      const key=r.year+'-'+(r.month<10?'0':'')+r.month;
+      if(!origByMonth[key])origByMonth[key]={label:MM(r.year,r.month),collaterals:{},total:0};
+      origByMonth[key].collaterals[r.collateral]=(origByMonth[key].collaterals[r.collateral]||0)+(r.orig_count||0);
+      origByMonth[key].total+=(r.orig_amount||0);
+    });
+    const origKeys=Object.keys(origByMonth).sort();
+    const origLabels=origKeys.map(k=>origByMonth[k].label);
+    const origDatasets=COLLATERALS.map(coll=>({
+      label:coll,
+      data:origKeys.map(k=>origByMonth[k].collaterals[coll]||0),
+      backgroundColor:COLL_BG[coll],
+      borderRadius:2,
+      yAxisID:'y'
+    }));
+    origDatasets.push({
+      label:'$ Volume',
+      data:origKeys.map(k=>origByMonth[k].total),
+      type:'line',
+      borderColor:'#fff',
+      borderWidth:2,
+      pointRadius:2,
+      tension:.3,
+      yAxisID:'y1'
+    });
+    mk('mainChart','bar',{labels:origLabels,datasets:origDatasets},{
+      plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},
+      scales:{
+        x:{...CD.scales.x,stacked:true},
+        y:{...CD.scales.y,stacked:true,position:'left',title:{display:true,text:'Loan Count',color:'#5c6180',font:{size:10}}},
+        y1:{...CD.scales.y,position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'$ Volume',color:'#5c6180',font:{size:10}},ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}
+      }
+    });
+  } else if(chartMode==='grossprofit'){
+    document.getElementById('mainChartTitle').textContent='Gross Profit by Collateral';
+    // Combine HIST_GP (2024-2026 actuals) + FORECAST_2026 (forecast months)
+    const gpByMonth={};
+    HIST_GP.forEach(r=>{
+      const key=r.year+'-'+(r.month<10?'0':'')+r.month;
+      if(!gpByMonth[key])gpByMonth[key]={label:MM(r.year,r.month),collaterals:{}};
+      gpByMonth[key].collaterals[r.collateral]=(gpByMonth[key].collaterals[r.collateral]||0)+(r.net_profit||0);
+    });
+    FORECAST_2026.filter(r=>r.is_forecast).forEach(r=>{
+      const key=r.year+'-'+(r.month<10?'0':'')+r.month;
+      if(!gpByMonth[key])gpByMonth[key]={label:MM(r.year,r.month),collaterals:{}};
+      gpByMonth[key].collaterals[r.collateral]=(gpByMonth[key].collaterals[r.collateral]||0)+(r.gp_net_profit||0);
+    });
+    const gpKeys=Object.keys(gpByMonth).sort();
+    const gpLabels=gpKeys.map(k=>gpByMonth[k].label);
+    const gpDatasets=COLLATERALS.map(coll=>({
+      label:coll,
+      data:gpKeys.map(k=>gpByMonth[k].collaterals[coll]||0),
+      backgroundColor:COLL_BG[coll],
+      borderRadius:2
+    }));
+    mk('mainChart','bar',{labels:gpLabels,datasets:gpDatasets},{
+      plugins:{legend:{labels:{color:'#8b90a8',font:{size:9}}}},
+      scales:{...CD.scales,x:{...CD.scales.x,stacked:true},y:{...CD.scales.y,stacked:true,ticks:{...CD.scales.y.ticks,callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}
+    });
   } else {
     document.getElementById('mainChartTitle').textContent='Monthly Cash Flow';
     mk('mainChart','line',{labels,datasets:[
@@ -660,7 +827,7 @@ function renderDashboard(){
 
   // DTE chart
   mk('dteChart','line',{labels,datasets:[
-    {label:'D/E',data:d.map(r=>Number(r.debt_to_equity)),borderColor:'#ff6b6b',tension:.3,pointRadius:2,yAxisID:'y'},
+    {label:'D/E',data:d.map(r=>Number(r.debt_to_equity)),borderColor:'#ff6b6b',tension:.3,pointRadius:2},
     {label:'ROE %',data:d.map(r=>r.roe_annualized!=null?Number(r.roe_annualized)*100:null),borderColor:'#00c9a7',tension:.3,pointRadius:2,yAxisID:'y1'}
   ]},{scales:{x:CD.scales.x,y:{...CD.scales.y,position:'left',title:{display:true,text:'D/E',color:'#5c6180',font:{size:10}}},y1:{...CD.scales.y,position:'right',title:{display:true,text:'ROE %',color:'#5c6180',font:{size:10}},grid:{drawOnChartArea:false}}}});
 
@@ -1127,10 +1294,10 @@ function renderOriginations(){
 function renderGrossProfit(){
   // Update titles
   document.getElementById('orMainChartTitle').textContent='GP Revenue by Month';
-  document.getElementById('orChart2Title').textContent='Net Profit by Collateral';
+  document.getElementById('orChart2Title').textContent='Gross Profit by Collateral';
   document.getElementById('orChart3Title').textContent='Forecast vs Actual (GP Revenue)';
   document.getElementById('orTableTitle').textContent='Monthly Gross Profit Detail';
-  document.getElementById('orTableHead').innerHTML='<th>Period</th><th>Collateral</th><th>Revenue (FC)</th><th>Revenue (Act)</th><th>Var %</th><th>Net Profit (FC)</th><th>Net Profit (Act)</th><th>Var %</th><th>Type</th>';
+  document.getElementById('orTableHead').innerHTML='<th>Period</th><th>Collateral</th><th>Revenue (FC)</th><th>Revenue (Act)</th><th>Var %</th><th>GP (FC)</th><th>GP (Act)</th><th>Var %</th><th>Type</th>';
 
   const fc=FORECAST_2026;
   const actuals=orActualsGP;
@@ -1139,7 +1306,12 @@ function renderGrossProfit(){
 
   const totalFcRev=fc.reduce((s,r)=>s+(r.gp_revenue||0),0);
   const totalFcNet=fc.reduce((s,r)=>s+(r.gp_net_profit||0),0);
-  const netMargin=totalFcRev>0?(totalFcNet/totalFcRev*100).toFixed(1)+'%':'—';
+  // Compute blended net margin from P&L data for 2025
+  const gpNI2025=plData.filter(r=>{const yr=new Date(r.period+'T00:00:00').getFullYear();return yr===2025&&!r.is_forecast;}).reduce((s,r)=>s+(Number(r.net_income)||0),0);
+  const gpRev2025=HIST_GP.filter(r=>r.year===2025).reduce((s,r)=>s+(r.revenue||0),0);
+  const blendedNetMargin=gpRev2025>0?gpNI2025/gpRev2025:0;
+  const fcNetProfit2026=totalFcRev*blendedNetMargin;
+  const netMarginPct=totalFcRev>0?(fcNetProfit2026/totalFcRev*100).toFixed(1)+'%':'—';
 
   let ytdActGP=null, variances=[];
   if(actuals.length){
@@ -1156,9 +1328,9 @@ function renderGrossProfit(){
 
   const cards=[
     {t:'2026 GP Revenue',v:$M(totalFcRev),d:'',s:'Full year forecast'},
-    {t:'2026 Net Profit',v:$M(totalFcNet),d:'',s:'Full year forecast'},
+    {t:'2026 Gross Profit',v:$M(totalFcNet),d:'',s:'Full year forecast'},
     {t:'YTD Actual GP',v:ytdActGP!=null?$M(ytdActGP):'—',d:'',s:actuals.length?`${[...new Set(actuals.map(r=>r.month))].length} months uploaded`:'No actuals uploaded'},
-    {t:'Net Margin %',v:netMargin,d:'',s:'GP Net / GP Revenue'}
+    {t:'Net Margin %',v:netMarginPct,d:'',s:'Blended from 2025 P&L'}
   ];
   document.getElementById('orKpiCards').innerHTML=cards.map(c=>`<div class="card card-sm"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div>${c.d}<div class="card-sub">${c.s}</div></div>`).join('');
 
@@ -1226,6 +1398,427 @@ function renderGrossProfit(){
   });
   document.getElementById('orTableCount').textContent=`${rows.length} rows`;
   document.getElementById('orTBody').innerHTML=rows.join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LOAN TAPE ANALYTICS
+// ═══════════════════════════════════════════════════════════════════
+let ltData=[];  // parsed loan tape rows
+let ltStratBy='fico';
+
+function parseLoanTape(rows){
+  // Auto-detect columns by looking for known patterns
+  const colMap={};
+  const headers=Object.keys(rows[0]||{});
+  headers.forEach(h=>{
+    const hl=h.toLowerCase();
+    if(hl.includes('high_v4')||hl.includes('fico')||hl.includes('credit_score'))colMap.fico=h;
+    if(hl.includes('loan_amt')||hl.includes('loan_amount')||hl.includes('amount_financed'))colMap.amount=h;
+    if(hl.includes('orig_apr')||hl.includes('apr')||hl.includes('rate'))colMap.apr=h;
+    if(hl==='term'||hl.includes('term'))colMap.term=h;
+    if(hl==='state'||hl.includes('state'))colMap.state=h;
+    if(hl.includes('open_date')||hl.includes('orig_date')||hl.includes('note_dt'))colMap.openDate=h;
+    if(hl.includes('chgoff_dt')||hl.includes('chargeoff_date'))colMap.coDate=h;
+    if(hl.includes('co amount')||hl.includes('co_amount')||hl.includes('chargeoff_amount'))colMap.coAmt=h;
+    if(hl.includes('recovery'))colMap.recovery=h;
+    if(hl.includes('account')||hl==='acct')colMap.account=h;
+    if(hl.includes('received_dt'))colMap.receivedDate=h;
+  });
+
+  // Find DPD snapshot columns (pattern: "Mon End Year DPD" or similar)
+  const dpdCols=headers.filter(h=>/\b(dpd|delinq|end.*bal)/i.test(h)||/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+end/i.test(h));
+  const balCols=headers.filter(h=>/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+end.*bal/i.test(h));
+  const dpdOnlyCols=headers.filter(h=>/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+end.*dpd/i.test(h));
+
+  return rows.map(r=>{
+    const fico=Number(r[colMap.fico])||0;
+    const amount=Number(r[colMap.amount])||0;
+    const apr=Number(r[colMap.apr])||0;
+    const term=Number(r[colMap.term])||0;
+    const state=r[colMap.state]||'';
+    const openDate=r[colMap.openDate]||r[colMap.receivedDate]||'';
+    const coDate=r[colMap.coDate]||'';
+    const coAmt=Number(r[colMap.coAmt])||0;
+    const recovery=Number(r[colMap.recovery])||0;
+    const isChargedOff=!!coDate||coAmt>0;
+
+    // Parse vintage year from open date
+    let vintageYear=0;
+    if(openDate){
+      const d=new Date(openDate);
+      if(!isNaN(d))vintageYear=d.getFullYear();
+    }
+
+    // Get latest DPD value
+    let latestDPD=0;
+    let maxDPD=0;
+    dpdOnlyCols.forEach(col=>{
+      const v=r[col];
+      if(v==='Charged Off')maxDPD=Math.max(maxDPD,999);
+      else if(v!=null&&v!==''){
+        const n=Number(v);
+        if(!isNaN(n)){latestDPD=n;maxDPD=Math.max(maxDPD,n);}
+      }
+    });
+
+    // MOB: months on book from open date to latest snapshot
+    let mob=0;
+    if(openDate){
+      const od=new Date(openDate);
+      const now=new Date(2026,2,31); // Mar 2026 latest snapshot
+      if(!isNaN(od))mob=Math.max(0,Math.round((now-od)/(30.44*86400000)));
+    }
+
+    return {fico,amount,apr,term,state,openDate,coDate,coAmt,recovery,isChargedOff,vintageYear,latestDPD,maxDPD,mob,raw:r,dpdCols:dpdOnlyCols,balCols};
+  });
+}
+
+function getBreaks(id){
+  const el=document.getElementById(id);
+  if(!el)return[];
+  return el.value.split(',').map(v=>Number(v.trim())).filter(v=>!isNaN(v)&&v>0).sort((a,b)=>a-b);
+}
+
+function bucketize(value, breaks, prefix, suffix){
+  if(breaks.length===0)return prefix+value+suffix;
+  if(value<breaks[0])return prefix+'<'+breaks[0]+suffix;
+  for(let i=0;i<breaks.length-1;i++){
+    if(value>=breaks[i]&&value<breaks[i+1])return prefix+breaks[i]+'-'+breaks[i+1]+suffix;
+  }
+  return prefix+breaks[breaks.length-1]+'+ '+suffix;
+}
+
+function stratifyLoans(data,by){
+  const buckets={};
+  const total=data.length;
+  const totalBal=data.reduce((s,l)=>s+l.amount,0);
+
+  data.forEach(loan=>{
+    let key='';
+    switch(by){
+      case 'fico': key=bucketize(loan.fico,getBreaks('ltFicoBreaks'),'',''); break;
+      case 'term': key=bucketize(loan.term,getBreaks('ltTermBreaks'),'','mo'); break;
+      case 'apr': key=bucketize(loan.apr,getBreaks('ltAprBreaks'),'','%'); break;
+      case 'state': key=loan.state||'Unknown'; break;
+      case 'vintage': key=loan.vintageYear?loan.vintageYear.toString():'Unknown'; break;
+      case 'amount': key=bucketize(loan.amount,getBreaks('ltAmtBreaks'),'$',''); break;
+    }
+    if(!buckets[key])buckets[key]={key,count:0,bal:0,ficoSum:0,aprSum:0,dpd30:0,dpd60:0,dpd90:0,co:0,coAmt:0,recovery:0};
+    const b=buckets[key];
+    b.count++;
+    b.bal+=loan.amount;
+    b.ficoSum+=loan.fico;
+    b.aprSum+=loan.apr;
+    if(loan.latestDPD>=1||loan.isChargedOff)b.dpd30++;
+    if(loan.latestDPD>=2||loan.isChargedOff)b.dpd60++;
+    if(loan.latestDPD>=3||loan.isChargedOff)b.dpd90++;
+    if(loan.isChargedOff){b.co++;b.coAmt+=loan.coAmt;b.recovery+=loan.recovery;}
+  });
+
+  return Object.values(buckets).sort((a,b)=>{
+    // Try numeric sort first
+    const na=parseFloat(a.key.replace(/[^0-9.-]/g,''));
+    const nb=parseFloat(b.key.replace(/[^0-9.-]/g,''));
+    if(!isNaN(na)&&!isNaN(nb))return na-nb;
+    return a.key.localeCompare(b.key);
+  }).map(b=>({
+    ...b,
+    pctCount:(b.count/total*100),
+    pctBal:(b.bal/totalBal*100),
+    avgFico:b.count?Math.round(b.ficoSum/b.count):0,
+    avgApr:b.count?(b.aprSum/b.count).toFixed(2):0,
+    dpd30Pct:(b.dpd30/b.count*100),
+    dpd60Pct:(b.dpd60/b.count*100),
+    dpd90Pct:(b.dpd90/b.count*100),
+    coPct:(b.co/b.count*100),
+    netLoss:b.coAmt-b.recovery
+  }));
+}
+
+function computeMOBCurves(data){
+  // Group by vintage year
+  const vintages={};
+  data.forEach(l=>{
+    if(!l.vintageYear||l.vintageYear<2020)return;
+    if(!vintages[l.vintageYear])vintages[l.vintageYear]={loans:[],count:0,totalBal:0};
+    vintages[l.vintageYear].loans.push(l);
+    vintages[l.vintageYear].count++;
+    vintages[l.vintageYear].totalBal+=l.amount;
+  });
+
+  // For each vintage, compute cumulative gross/net loss by MOB
+  const curves={};
+  Object.entries(vintages).forEach(([yr,v])=>{
+    const maxMob=Math.max(...v.loans.map(l=>l.mob));
+    const cgl=[];
+    const cnl=[];
+    for(let m=0;m<=Math.min(maxMob,60);m+=3){ // quarterly buckets
+      const coLoans=v.loans.filter(l=>l.isChargedOff&&l.mob<=m);
+      const grossLoss=coLoans.reduce((s,l)=>s+l.coAmt,0);
+      const recoveries=coLoans.reduce((s,l)=>s+l.recovery,0);
+      cgl.push({mob:m,rate:v.totalBal>0?grossLoss/v.totalBal*100:0});
+      cnl.push({mob:m,rate:v.totalBal>0?(grossLoss-recoveries)/v.totalBal*100:0});
+    }
+    curves[yr]={cgl,cnl,count:v.count,totalBal:v.totalBal};
+  });
+  return curves;
+}
+
+function forecastTerminalLoss(curves){
+  // Use older vintages' seasoning pattern to extrapolate newer ones
+  const vintageYears=Object.keys(curves).map(Number).sort();
+  const results={};
+  vintageYears.forEach(yr=>{
+    const c=curves[yr];
+    if(!c.cgl.length){results[yr]={termCGL:0,termCNL:0};return;}
+    const lastCGL=c.cgl[c.cgl.length-1].rate;
+    const lastCNL=c.cnl[c.cnl.length-1].rate;
+    const lastMob=c.cgl[c.cgl.length-1].mob;
+
+    // Find an older vintage with more seasoning to extrapolate
+    let scaleFactor=1;
+    for(let i=vintageYears.indexOf(yr)-1;i>=0;i--){
+      const olderYr=vintageYears[i];
+      const older=curves[olderYr];
+      if(!older.cgl.length)continue;
+      // Find the older vintage's rate at the same MOB
+      const olderAtSameMob=older.cgl.find(p=>p.mob>=lastMob);
+      const olderTerminal=older.cgl[older.cgl.length-1].rate;
+      if(olderAtSameMob&&olderAtSameMob.rate>0){
+        scaleFactor=olderTerminal/olderAtSameMob.rate;
+        break;
+      }
+    }
+    results[yr]={
+      termCGL:lastCGL*Math.max(1,scaleFactor),
+      termCNL:lastCNL*Math.max(1,scaleFactor),
+      currentCGL:lastCGL,
+      currentCNL:lastCNL,
+      maxMob:lastMob
+    };
+  });
+  return results;
+}
+
+function generateInsights(data,strat,curves,terminal){
+  const insights=[];
+  const total=data.length;
+  const totalBal=data.reduce((s,l)=>s+l.amount,0);
+  const coRate=data.filter(l=>l.isChargedOff).length/total*100;
+  const avgFico=Math.round(data.reduce((s,l)=>s+l.fico,0)/total);
+
+  // 1. State concentration
+  const stateCounts={};
+  data.forEach(l=>{if(l.state)stateCounts[l.state]=(stateCounts[l.state]||0)+1;});
+  const topStates=Object.entries(stateCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const top3Pct=topStates.slice(0,3).reduce((s,[,c])=>s+c,0)/total*100;
+  if(top3Pct>50){
+    insights.push({rank:1,title:'Geographic Concentration Risk',body:`Top 3 states (${topStates.slice(0,3).map(([s])=>s).join(', ')}) represent ${top3Pct.toFixed(1)}% of loans. Consider geographic diversification to reduce regional economic exposure.`,action:'Review state-level performance and consider concentration limits.'});
+  }
+
+  // 2. FICO-amount correlation with CO
+  const lowFicoHighAmt=data.filter(l=>l.fico<660&&l.amount>15000);
+  const lowFicoHighAmtCO=lowFicoHighAmt.filter(l=>l.isChargedOff).length;
+  if(lowFicoHighAmt.length>20){
+    const rate=lowFicoHighAmtCO/lowFicoHighAmt.length*100;
+    if(rate>coRate*1.5){
+      insights.push({rank:2,title:'High-Risk Segment: Low FICO + High Balance',body:`Loans with FICO <660 and amount >$15K (${lowFicoHighAmt.length} loans) have a ${rate.toFixed(1)}% charge-off rate, ${(rate/coRate).toFixed(1)}x the portfolio average of ${coRate.toFixed(1)}%.`,action:'Consider tighter amount caps for sub-660 FICO borrowers.'});
+    }
+  }
+
+  // 3. Term risk
+  const longTerm=data.filter(l=>l.term>=120);
+  const longTermCO=longTerm.filter(l=>l.isChargedOff).length;
+  if(longTerm.length>50){
+    const rate=longTermCO/longTerm.length*100;
+    if(rate>coRate*1.3){
+      insights.push({rank:3,title:'Extended Term Risk',body:`Loans with 120+ month terms (${longTerm.length} loans) show ${rate.toFixed(1)}% CO rate vs portfolio avg ${coRate.toFixed(1)}%.`,action:'Review pricing adequacy for longer terms or cap maximum term.'});
+    }
+  }
+
+  // 4. FICO cutoff analysis
+  const sub600=data.filter(l=>l.fico>0&&l.fico<600);
+  const sub600CO=sub600.filter(l=>l.isChargedOff).length;
+  if(sub600.length>10){
+    const rate=sub600CO/sub600.length*100;
+    insights.push({rank:4,title:'Sub-600 FICO Performance',body:`${sub600.length} loans (${(sub600.length/total*100).toFixed(1)}%) have FICO <600 with ${rate.toFixed(1)}% CO rate. These represent ${(sub600.reduce((s,l)=>s+l.coAmt,0)/data.reduce((s,l)=>s+l.coAmt,0)*100).toFixed(1)}% of total CO dollars.`,action:'Evaluate whether sub-600 volume justifies the risk; consider score floor adjustment.'});
+  }
+
+  // 5. State hotspots
+  const statePerf={};
+  data.forEach(l=>{
+    if(!l.state)return;
+    if(!statePerf[l.state])statePerf[l.state]={total:0,co:0};
+    statePerf[l.state].total++;
+    if(l.isChargedOff)statePerf[l.state].co++;
+  });
+  const hotStates=Object.entries(statePerf).filter(([,v])=>v.total>=30).map(([s,v])=>({state:s,...v,rate:v.co/v.total*100})).sort((a,b)=>b.rate-a.rate).slice(0,3);
+  if(hotStates.length&&hotStates[0].rate>coRate*1.5){
+    insights.push({rank:5,title:'State-Level Charge-Off Hotspots',body:`Highest CO rates: ${hotStates.map(s=>`${s.state} (${s.rate.toFixed(1)}%, n=${s.total})`).join(', ')}. Portfolio avg: ${coRate.toFixed(1)}%.`,action:'Investigate state-level economic factors and review underwriting criteria for flagged states.'});
+  }
+
+  // 6. Vintage deterioration
+  const vintageYrs=Object.keys(terminal).map(Number).sort();
+  if(vintageYrs.length>=2){
+    const latest=vintageYrs[vintageYrs.length-1];
+    const prev=vintageYrs[vintageYrs.length-2];
+    if(terminal[latest]&&terminal[prev]&&terminal[latest].termCGL>terminal[prev].termCGL*1.2){
+      insights.push({rank:6,title:'Vintage Deterioration',body:`${latest} vintage projected terminal CGL of ${terminal[latest].termCGL.toFixed(2)}% vs ${prev} at ${terminal[prev].termCGL.toFixed(2)}%, a ${((terminal[latest].termCGL/terminal[prev].termCGL-1)*100).toFixed(0)}% increase.`,action:'Review origination quality trends and tighten underwriting for recent production.'});
+    }
+  }
+
+  // Sort by rank
+  return insights.sort((a,b)=>a.rank-b.rank);
+}
+
+const VINTAGE_COLORS=['#7c6cf0','#4dabf7','#00c9a7','#ffa94d','#ff6b6b','#a89cff','#66d9e8'];
+
+function renderLoanTape(){
+  if(!ltData.length)return;
+  document.getElementById('ltDashboard').style.display='block';
+
+  const total=ltData.length;
+  const totalBal=ltData.reduce((s,l)=>s+l.amount,0);
+  const avgFico=Math.round(ltData.reduce((s,l)=>s+l.fico,0)/total);
+  const coCount=ltData.filter(l=>l.isChargedOff).length;
+  const coRate=(coCount/total*100).toFixed(1);
+  const totalCOAmt=ltData.reduce((s,l)=>s+l.coAmt,0);
+  const totalRecov=ltData.reduce((s,l)=>s+l.recovery,0);
+
+  // KPI cards
+  const cards=[
+    {t:'Total Loans',v:N(total),d:'',s:$M(totalBal)+' total balance'},
+    {t:'Avg FICO',v:N(avgFico),d:'',s:'Weighted by count'},
+    {t:'Charge-Off Rate',v:coRate+'%',d:'',s:N(coCount)+' charge-offs'},
+    {t:'Net Loss',v:$M(totalCOAmt-totalRecov),d:'',s:$M(totalRecov)+' recovered'}
+  ];
+  document.getElementById('ltKpiCards').innerHTML=cards.map(c=>`<div class="card card-sm"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div>${c.d}<div class="card-sub">${c.s}</div></div>`).join('');
+
+  // Stratification
+  const by=document.getElementById('ltStratBy').value;
+  const strat=stratifyLoans(ltData,by);
+
+  // Chart 1: Balance & count distribution
+  const bucketLabels=strat.map(s=>s.key);
+  document.getElementById('ltChart1Title').textContent=`Balance Distribution by ${by.charAt(0).toUpperCase()+by.slice(1)}`;
+  mk('ltChart1','bar',{labels:bucketLabels,datasets:[
+    {label:'Balance %',data:strat.map(s=>s.pctBal),backgroundColor:'rgba(124,108,240,0.7)',borderRadius:2,yAxisID:'y'},
+    {label:'Count %',data:strat.map(s=>s.pctCount),type:'line',borderColor:'#00c9a7',tension:.3,pointRadius:3,yAxisID:'y1'}
+  ]},{scales:{x:CD.scales.x,y:{...CD.scales.y,position:'left',ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(0)+'%'}},y1:{...CD.scales.y,position:'right',grid:{drawOnChartArea:false},ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(0)+'%'}}}});
+
+  // Chart 2: Delinquency rates
+  document.getElementById('ltChart2Title').textContent=`Delinquency by ${by.charAt(0).toUpperCase()+by.slice(1)}`;
+  mk('ltChart2','bar',{labels:bucketLabels,datasets:[
+    {label:'30+ DPD',data:strat.map(s=>s.dpd30Pct),backgroundColor:'rgba(255,169,77,0.7)',borderRadius:2},
+    {label:'60+ DPD',data:strat.map(s=>s.dpd60Pct),backgroundColor:'rgba(255,107,107,0.7)',borderRadius:2},
+    {label:'90+ DPD',data:strat.map(s=>s.dpd90Pct),backgroundColor:'rgba(124,108,240,0.7)',borderRadius:2},
+    {label:'CO',data:strat.map(s=>s.coPct),backgroundColor:'rgba(168,156,255,0.7)',borderRadius:2}
+  ]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(1)+'%'}}}});
+
+  // MOB curves
+  const mobCurves=computeMOBCurves(ltData);
+  const vintageYears=Object.keys(mobCurves).sort();
+
+  // CGL curves
+  const maxMob=Math.max(...vintageYears.map(yr=>mobCurves[yr].cgl.length?mobCurves[yr].cgl[mobCurves[yr].cgl.length-1].mob:0));
+  const mobLabels=[];
+  for(let m=0;m<=maxMob;m+=3)mobLabels.push(m.toString());
+
+  const cglDatasets=vintageYears.map((yr,i)=>({
+    label:yr,
+    data:mobLabels.map(m=>{
+      const p=mobCurves[yr].cgl.find(pt=>pt.mob===Number(m));
+      return p?p.rate:null;
+    }),
+    borderColor:VINTAGE_COLORS[i%VINTAGE_COLORS.length],
+    tension:.3,pointRadius:2,spanGaps:true
+  }));
+  mk('ltMobCgl','line',{labels:mobLabels,datasets:cglDatasets},{scales:{...CD.scales,x:{...CD.scales.x,title:{display:true,text:'Months on Book',color:'#5c6180',font:{size:10}}},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(1)+'%'}}}});
+
+  // CNL curves
+  const cnlDatasets=vintageYears.map((yr,i)=>({
+    label:yr,
+    data:mobLabels.map(m=>{
+      const p=mobCurves[yr].cnl.find(pt=>pt.mob===Number(m));
+      return p?p.rate:null;
+    }),
+    borderColor:VINTAGE_COLORS[i%VINTAGE_COLORS.length],
+    tension:.3,pointRadius:2,spanGaps:true
+  }));
+  mk('ltMobCnl','line',{labels:mobLabels,datasets:cnlDatasets},{scales:{...CD.scales,x:{...CD.scales.x,title:{display:true,text:'Months on Book',color:'#5c6180',font:{size:10}}},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(1)+'%'}}}});
+
+  // Terminal CGL/CNL forecast
+  const terminal=forecastTerminalLoss(mobCurves);
+  const termVintages=Object.keys(terminal).sort();
+  mk('ltTerminalChart','bar',{labels:termVintages,datasets:[
+    {label:'Current CGL',data:termVintages.map(yr=>terminal[yr].currentCGL||0),backgroundColor:'rgba(124,108,240,0.5)',borderRadius:2},
+    {label:'Projected Terminal CGL',data:termVintages.map(yr=>terminal[yr].termCGL||0),backgroundColor:'rgba(124,108,240,0.9)',borderRadius:2},
+    {label:'Current CNL',data:termVintages.map(yr=>terminal[yr].currentCNL||0),backgroundColor:'rgba(0,201,167,0.5)',borderRadius:2},
+    {label:'Projected Terminal CNL',data:termVintages.map(yr=>terminal[yr].termCNL||0),backgroundColor:'rgba(0,201,167,0.9)',borderRadius:2}
+  ]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(1)+'%'}}}});
+
+  // CO rate by FICO scatter-ish (use bar with FICO bands)
+  const ficoBands=stratifyLoans(ltData,'fico');
+  mk('ltCoFicoChart','bar',{labels:ficoBands.map(s=>s.key),datasets:[
+    {label:'CO Rate %',data:ficoBands.map(s=>s.coPct),backgroundColor:ficoBands.map(s=>s.coPct>10?'rgba(255,107,107,0.7)':s.coPct>5?'rgba(255,169,77,0.7)':'rgba(0,201,167,0.7)'),borderRadius:2}
+  ]},{plugins:{legend:{display:false}},scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>v.toFixed(1)+'%'}}}});
+
+  // Table
+  document.getElementById('ltTableCount').textContent=`${strat.length} buckets`;
+  document.getElementById('ltTBody').innerHTML=strat.map(s=>`<tr><td>${s.key}</td><td>${N(s.count)}</td><td>${s.pctCount.toFixed(1)}%</td><td>${$(s.bal)}</td><td>${s.pctBal.toFixed(1)}%</td><td>${s.avgFico}</td><td>${s.avgApr}%</td><td>${s.dpd30Pct.toFixed(1)}%</td><td>${s.dpd60Pct.toFixed(1)}%</td><td>${s.dpd90Pct.toFixed(1)}%</td><td>${s.coPct.toFixed(1)}%</td></tr>`).join('');
+
+  // AI Insights
+  const insights=generateInsights(ltData,strat,mobCurves,terminal);
+  if(insights.length){
+    document.getElementById('ltInsights').innerHTML=insights.map(ins=>`<div class="insight-card"><div class="insight-rank">#${ins.rank} Insight</div><div class="insight-title">${ins.title}</div><div class="insight-body">${ins.body}</div><div class="insight-action">→ ${ins.action}</div></div>`).join('');
+  } else {
+    document.getElementById('ltInsights').innerHTML='<div class="insight-card"><div class="insight-body">No significant concentration risks or anomalies detected. Portfolio metrics are within normal ranges.</div></div>';
+  }
+}
+
+function handleLoanTapeFile(file){
+  if(!file)return;
+  const statusEl=document.getElementById('ltUploadStatus');
+  statusEl.textContent='Processing…';
+  statusEl.style.color='var(--accent2)';
+  statusEl.style.display='block';
+
+  const ext=file.name.split('.').pop().toLowerCase();
+
+  if(ext==='csv'){
+    const reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        const rows=parseCSV(e.target.result);
+        ltData=parseLoanTape(rows);
+        statusEl.textContent=`Loaded ${ltData.length} loans from CSV`;
+        statusEl.style.color='var(--green)';
+        renderLoanTape();
+      }catch(err){
+        statusEl.textContent='Parse error: '+err.message;
+        statusEl.style.color='var(--red)';
+      }
+    };
+    reader.readAsText(file);
+  } else {
+    // XLSX
+    const reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const jsonData=XLSX.utils.sheet_to_json(ws);
+        ltData=parseLoanTape(jsonData);
+        statusEl.textContent=`Loaded ${ltData.length} loans from ${file.name}`;
+        statusEl.style.color='var(--green)';
+        renderLoanTape();
+      }catch(err){
+        statusEl.textContent='Parse error: '+err.message;
+        statusEl.style.color='var(--red)';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
 }
 
 // ─── CSV UPLOAD HANDLER ──────────────────────────────────────────
@@ -1312,6 +1905,23 @@ document.getElementById('orSubTab').addEventListener('click',e=>{if(!e.target.da
   zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');if(e.dataTransfer.files.length)handleActualsFile(e.dataTransfer.files[0]);});
   fileInput.addEventListener('change',e=>{if(e.target.files.length)handleActualsFile(e.target.files[0]);});
 })();
+
+// Loan Tape events
+(function(){
+  const zone=document.getElementById('ltUploadZone');
+  const fileInput=document.getElementById('ltFileInput');
+  zone.addEventListener('click',()=>fileInput.click());
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
+  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');if(e.dataTransfer.files.length)handleLoanTapeFile(e.dataTransfer.files[0]);});
+  fileInput.addEventListener('change',e=>{if(e.target.files.length)handleLoanTapeFile(e.target.files[0]);});
+})();
+
+// Loan Tape stratification controls
+document.getElementById('ltStratBy').addEventListener('change',()=>{if(ltData.length)renderLoanTape();});
+['ltFicoBreaks','ltTermBreaks','ltAprBreaks','ltAmtBreaks'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',()=>{if(ltData.length)renderLoanTape();});
+});
 
 // Restore actuals from localStorage
 (function(){
